@@ -1,0 +1,30 @@
+{
+  "type": "done",
+  "message": {
+    "model": "claude-3-5-haiku-20241022",
+    "id": "msg_01Qku92r5Xcqndjko3u9Jn2L",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "Here are several ways to create a good-looking button using HTML and CSS:\n\n1. Basic Modern Button:\n```html\n<!DOCTYPE html>\n<html>\n<head>\n    <style>\n        .btn {\n            background-color: #4CAF50;\n            border: none;\n            color: white;\n            padding: 15px 32px;\n            text-align: center;\n            text-decoration: none;\n            display: inline-block;\n            font-size: 16px;\n            margin: 4px 2px;\n            cursor: pointer;\n            border-radius: 8px;\n            transition: background-color 0.3s ease;\n        }\n\n        .btn:hover {\n            background-color: #45a049;\n        }\n    </style>\n</head>\n<body>\n    <button class=\"btn\">Click Me</button>\n</body>\n</html>\n```\n\n2. Gradient Button:\n```html\n<!DOCTYPE html>\n<html>\n<head>\n    <style>\n        .gradient-btn {\n            background: linear-gradient(to right, #ff7e5f, #feb47b);\n            border: none;\n            color: white;\n            padding: 15px 32px;\n            text-align: center;\n            text-decoration: none;\n            display: inline-block;\n            font-size: 16px;\n            margin: 4px 2px;\n            cursor: pointer;\n            border-radius: 50px;\n            box-shadow: 0 4px 6px rgba(0,0,0,0.1);\n            transition: transform 0.3s ease;\n        }\n\n        .gradient-btn:hover {\n            transform: scale(1.05);\n        }\n    </style>\n</head>\n<body>\n    <button class=\"gradient-btn\">Submit</button>\n</body>\n</html>\n```\n\n3. Flat Design Button:\n```html\n<!DOCTYPE html>\n<html>\n<head>\n    <style>\n        .flat-btn {\n            backgroun"
+      }
+    ],
+    "stop_reason": "max_tokens",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 12,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "cache_creation": {
+        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_1h_input_tokens": 0
+      },
+      "output_tokens": 500,
+      "service_tier": "standard"
+    }
+  },
+  "fullText": "",
+  "truncated": true
+}
