@@ -11,7 +11,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useAppSelector } from "@/hooks/redux";
 
 export const HeroHeader = () => {
   const [menuState, setMenuState] = useState(false);

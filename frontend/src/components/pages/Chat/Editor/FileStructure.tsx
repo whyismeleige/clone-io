@@ -1,5 +1,4 @@
 "use client";
-import { Button } from "@/components/ui/button";
 import {
   Collapsible,
   CollapsibleTrigger,
@@ -14,26 +13,21 @@ import {
 } from "@/components/ui/context-menu";
 import { Input } from "@/components/ui/input";
 import {
-  Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
-  SidebarRail,
 } from "@/components/ui/sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAppDispatch, useAppSelector } from "@/hooks/redux";
-import { AppDispatch } from "@/store";
-import { changeCurrentFile } from "@/store/slices/chat.slice";
+import { useChatContext } from "@/context/chat.context";
 import { FileItem } from "@/types";
 import {
   ChevronRight,
   Copy,
   Delete,
   File,
-  FileIcon,
   FilePlus,
   Folder,
   FolderCode,
@@ -105,9 +99,7 @@ const contextMenuData = [
 ];
 
 export default function FileStructure() {
-  const dispatch = useAppDispatch();
-  const { files, currentFile } = useAppSelector((state) => state.chat);
-  
+const { files, changeCurrentFile } = useChatContext();  
   return (
     <section className="border-r overflow-visible">
       <Tabs defaultValue="files" className="gap-0">
@@ -128,7 +120,7 @@ export default function FileStructure() {
             <TabsContent value="files">
               <SidebarContent>
                 <SidebarGroup>
-                  <SidebarMenu>{Tree(files, dispatch)}</SidebarMenu>
+                  <SidebarMenu>{Tree(files, changeCurrentFile)}</SidebarMenu>
                 </SidebarGroup>
               </SidebarContent>
             </TabsContent>
@@ -166,11 +158,11 @@ export default function FileStructure() {
   );
 }
 
-export const Tree = (files: FileItem[], dispatch: AppDispatch, name?: string) => {
+export const Tree = (files: FileItem[], changeCurrentFile: (file: FileItem) => void, name?: string) => {
   return files.map((item, index) => {
     return item.type === "file" ? (
       <SidebarMenuButton
-        onClick={() => dispatch(changeCurrentFile(item))}
+        onClick={() => changeCurrentFile(item)}
         className="cursor-pointer"
         key={index}
       >
@@ -189,7 +181,7 @@ export const Tree = (files: FileItem[], dispatch: AppDispatch, name?: string) =>
           </CollapsibleTrigger>
           {item.children?.length ? (
             <CollapsibleContent>
-              <SidebarMenuSub>{Tree(item.children, dispatch, name)}</SidebarMenuSub>
+              <SidebarMenuSub>{Tree(item.children,changeCurrentFile, name)}</SidebarMenuSub>
             </CollapsibleContent>
           ) : null}
         </Collapsible>

@@ -28,14 +28,14 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarRail,
-  SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useAppSelector } from "@/hooks/redux";
+import { User } from "@/types/auth.types";
 import { SiAnthropic } from "@icons-pack/react-simple-icons";
 import {
   Bell,
   CreditCard,
-  DotSquare,
   EllipsisVertical,
   LogOut,
   Minus,
@@ -45,7 +45,14 @@ import {
   UserCircle,
 } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 export default function AppSidebar() {
+   const {user} = useAppSelector((state) => state.auth )
+   const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   return (
     <Sidebar>
       <SidebarHeader>
@@ -66,7 +73,7 @@ export default function AppSidebar() {
         <NavSecondary />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser />
+        <NavUser user={mounted ? user : null}/>
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
@@ -143,7 +150,7 @@ const NavSecondary = () => {
   );
 };
 
-const NavUser = () => {
+const NavUser = ({user} : {user: User | null}) => {
   const { isMobile } = useSidebar();
   return (
     <SidebarMenu>
@@ -154,14 +161,14 @@ const NavUser = () => {
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <Avatar className="h-8 w-8 rounded-lg grayscale">
-                <AvatarImage src="https://avatars.steamstatic.com/0080c1eebf4fc785c7944995bec1abb8818e2510_full.jpg" />
+              <Avatar className="h-8 w-8 rounded-lg">
+                <AvatarImage src={user?.avatar} alt={user?.name} />
                 <AvatarFallback className="rounded-lg">CN</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">Piyush Jain</span>
+                <span className="truncate font-medium">{user?.name}</span>
                 <span className="text-muted-foreground truncate text-xs">
-                  piyushjain31456@gmail.com
+                  {user?.email}
                 </span>
               </div>
               <EllipsisVertical className="ml-auto size-4" />
@@ -176,13 +183,13 @@ const NavUser = () => {
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage src="https://avatars.steamstatic.com/0080c1eebf4fc785c7944995bec1abb8818e2510_full.jpg" />
+                  <AvatarImage src={user?.avatar} alt={user?.name}/>
                   <AvatarFallback className="rounded-lg">CN</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">Piyush Jain</span>
+                  <span className="truncate font-medium">{user?.name}</span>
                   <span className="text-muted-foreground truncate text-xs">
-                    piyushjain31456@gmail.com
+                    {user?.email}
                   </span>
                 </div>
               </div>

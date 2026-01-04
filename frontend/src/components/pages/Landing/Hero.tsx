@@ -1,41 +1,17 @@
 "use client";
-import React, { Component, KeyboardEvent, useEffect, useState } from "react";
-import Link from "next/link";
+import React, { useEffect, useState } from "react";
 import {
-  ArrowRight,
   ArrowUp,
-  Bot,
-  BoxSelect,
-  Check,
-  ChevronRight,
-  Icon,
   PlusIcon,
 } from "lucide-react";
-import {
-  SiAnthropic,
-  SiOpenai,
-  IconType,
-} from "@icons-pack/react-simple-icons";
 import { Button } from "@/components/ui/button";
-import Image from "next/image";
 import { TextEffect } from "@/components/motion-primitives/text-effect";
-
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
-  InputGroupText,
   InputGroupTextarea,
 } from "@/components/ui/input-group";
-import { Separator } from "@/components/ui/separator";
 import { animate } from "framer-motion";
 import {
   Tooltip,
@@ -43,45 +19,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Kbd } from "@/components/ui/kbd";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { cn } from "@/lib/utils";
 import { ModelCombobox } from "@/components/shared/ModelCombobox";
 import { useAppSelector } from "@/hooks/redux";
 import { useDispatch } from "react-redux";
-import { changeCurrentPrompt, sendPrompt } from "@/store/slices/chat.slice";
 import { useRouter } from "next/navigation";
-
-const transitionVariants = {
-  item: {
-    hidden: {
-      opacity: 0,
-      filter: "blur(12px)",
-      y: 12,
-    },
-    visible: {
-      opacity: 1,
-      filter: "blur(0px)",
-      y: 0,
-      transition: {
-        type: "spring",
-        bounce: 0.3,
-        duration: 1.5,
-      },
-    },
-  },
-};
+import { useChatContext } from "@/context/chat.context";
 
 const phrases = [
   `Recreate the minimal, clean style of https://www.notion.so for a productivity tool website.`,
@@ -100,13 +42,12 @@ export default function HeroMain() {
   const [placeholder, setPlaceholder] = useState("");
   const [showTabBtn, toggleShowTabBtn] = useState(false);
 
-  const userPrompt = useAppSelector((state) => state.chat.currentPrompt);
-
-  const dispatch = useDispatch();
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
+  const { prompt, setPrompt } = useChatContext();
   const router = useRouter();
 
   useEffect(() => {
-    if (userPrompt !== "") return;
+    if (prompt !== "") return;
 
     let shouldStop = false;
     let phraseToSet = "";
@@ -144,7 +85,7 @@ export default function HeroMain() {
     const handleKeyDown = (e: globalThis.KeyboardEvent) => {
       if (e.key === "Tab") {
         e.preventDefault();
-        dispatch(changeCurrentPrompt(phraseToSet));
+        setPrompt(phraseToSet)
       }
     };
 
@@ -154,13 +95,14 @@ export default function HeroMain() {
       shouldStop = true;
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [userPrompt]);
+  }, [prompt, setPrompt]);
 
   const handlePrompt = () => {
-    dispatch(sendPrompt());
-    router.push("/chat/id");
-  }
-  return ( 
+    if(!isAuthenticated) {
+      router.push("/auth?mode=Login")
+    }
+  };
+  return (
     <main className="overflow-hidden">
       <div
         aria-hidden
@@ -201,10 +143,8 @@ export default function HeroMain() {
                 <InputGroup>
                   <InputGroupTextarea
                     placeholder={placeholder}
-                    value={userPrompt}
-                    onChange={(e) =>
-                      dispatch(changeCurrentPrompt(e.target.value))
-                    }
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
                   />
                   {showTabBtn && (
                     <div className="absolute top-2 right-2 flex flex-wrap items-center gap-4">
@@ -222,15 +162,20 @@ export default function HeroMain() {
                       <PlusIcon />
                     </InputGroupButton>
                     <ModelCombobox />
-                    <InputGroupButton
-                      variant="default"
-                      className="ml-auto rounded-full cursor-pointer"
-                      size="icon-xs"
-                      onClick={handlePrompt}
-                      disabled={!userPrompt}
-                    >
-                      <ArrowUp />
-                    </InputGroupButton>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <InputGroupButton
+                          variant="default"
+                          className="ml-auto rounded-full cursor-pointer"
+                          size="icon-xs"
+                          onClick={handlePrompt}
+                          disabled={!prompt}
+                        >
+                          <ArrowUp />
+                        </InputGroupButton>
+                      </TooltipTrigger>
+                      <TooltipContent>Send</TooltipContent>
+                    </Tooltip>
                   </InputGroupAddon>
                 </InputGroup>
               </div>

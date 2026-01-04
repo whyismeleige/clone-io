@@ -17,7 +17,7 @@ const ChatSchema = new mongoose.Schema(
       trim: true,
       required: true,
     },
-    conversation: [
+    conversations: [
       {
         role: {
           type: String,
@@ -93,6 +93,11 @@ const ChatSchema = new mongoose.Schema(
 
 ChatSchema.index({ createdBy: 1, createdAt: -1 });
 ChatSchema.index({ projectName: "text" });
+
+ChatSchema.methods.saveConversation = async function (role, content) {
+  this.conversations.push({role, content});
+  await this.save();
+}
 
 ChatSchema.pre("save", function () {
   if (this.isModified("conversation")) {

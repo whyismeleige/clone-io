@@ -13,7 +13,7 @@ const chatRoutes = require("./routes/chat.routes");
 
 app.use(
   cors({
-    origin: ["https://josh-net.vercel.app/", "http://localhost:3000"],
+    origin: ["https://josh-net.vercel.app/", "http://localhost:3001", "http://localhost:3000"],
     credentials: true,
   })
 );

@@ -33,6 +33,7 @@ const TokenService = {
       const payload = JSON.parse(atob(token.split(".")[1]));
       return Date.now() >= payload.exp * 1000;
     } catch (error) {
+      console.error("Error in Token Expiration", error);
       return true;
     }
   },

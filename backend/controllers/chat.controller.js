@@ -5,6 +5,7 @@ const { nodeJSBasePrompt } = require("../utils/prompts/defaults/node");
 const asyncHandler = require("../middleware/asyncHandler");
 const db = require("../models");
 const { ValidationError, ExternalAPIError } = require("../utils/errors.utils");
+const { dummyPromptData } = require("../utils/dummyData");
 const anthropic = new Anthropic();
 
 const User = db.user;
@@ -62,12 +63,70 @@ exports.sendPrompt = asyncHandler(async (req, res) => {
 
   const chat = await Chat.findById(chatId);
 
+  await chat.saveConversation("user", messages[messages.length - 1].content);
+
+  if (!chat) {
+    throw new ValidationError("Chat not found");
+  }
+
   try {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
 
-    const MAX_TOKENS = process.env.NODE_ENV === "production" ? 16000 : 500;
+    const MAX_TOKENS = process.env.NODE_ENV === "production" ? 16000 : 200;
+
+    if (process.env.NODE_ENV !== "production") {
+      // Dummy response data
+      const dummyResponse = dummyPromptData;
+
+      const fullText = dummyResponse.content[0].text;
+
+      // Simulate message_start
+      res.write(
+        `data: ${JSON.stringify({
+          type: "message_start",
+          message: dummyResponse,
+        })}\n\n`
+      );
+
+      // Simulate streaming text in chunks
+      const chunkSize = 50;
+      for (let i = 0; i < fullText.length; i += chunkSize) {
+        const length = Math.min(fullText.length - 1, i+chunkSize);
+        const chunk = fullText.slice(i, length);
+        
+        res.write(
+          `data: ${JSON.stringify({
+            type: "text_block",
+            delta: chunk,
+          })}\n\n`
+        );
+
+        // Add small delay to simulate streaming
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+
+      // Save conversation
+      await chat.saveConversation("assistant", fullText);
+
+      // Send final message
+      res.write(
+        `data: ${JSON.stringify({
+          type: "done",
+          message: dummyResponse,
+          fullText,
+          truncated: dummyResponse.stop_reason === "max_tokens",
+        })}\n\n`
+      );
+
+      console.log(
+        `Tokens used (dummy): ${dummyResponse.usage.output_tokens}/${MAX_TOKENS}`
+      );
+
+      res.end();
+      return;
+    }
 
     const stream = await anthropic.messages.stream({
       messages,
@@ -77,7 +136,7 @@ exports.sendPrompt = asyncHandler(async (req, res) => {
 
     let fullText = "";
 
-    stream.on("messageStart", (message) => {
+    stream.on("connect", (message) => {
       res.write(
         `data: ${JSON.stringify({
           type: "message_start",
@@ -86,17 +145,15 @@ exports.sendPrompt = asyncHandler(async (req, res) => {
       );
     });
 
-    stream.on("contentBlockDelta", (delta) => {
-      if (delta.type === "text_delta") {
-        fullText += delta.text;
+    stream.on("text", (text) => {
+      fullText += text;
 
-        res.write(
-          `data: ${JSON.stringify({
-            type: "content_block_delta",
-            delta: delta.text,
-          })}\n\n`
-        );
-      }
+      res.write(
+        `data: ${JSON.stringify({
+          type: "text_block",
+          delta: text,
+        })}\n\n`
+      );
     });
 
     stream.on("end", async () => {
@@ -106,6 +163,8 @@ exports.sendPrompt = asyncHandler(async (req, res) => {
       if (finalMessage.stop_reason === "max_tokens") {
         console.warn("⚠️  Response truncated due to max_tokens limit");
       }
+
+      await chat.saveConversation("assistant", finalMessage.content[0].text);
 
       res.write(
         `data: ${JSON.stringify({
@@ -187,12 +246,6 @@ exports.createTemplate = asyncHandler(async (req, res) => {
   const newChat = await Chat.create({
     projectName: projectTitle,
     model: "claude-sonnet-4-20250514",
-    conversation: [
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
     createdBy: req.user._id,
   });
 
@@ -200,7 +253,7 @@ exports.createTemplate = asyncHandler(async (req, res) => {
     return res.status(200).send({
       message: "React Template created successfully",
       type: "success",
-      chatId: newChat._id,
+      newChat,
       prompts: [
         BASE_PROMPT,
         `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${reactJSBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`,
@@ -213,6 +266,7 @@ exports.createTemplate = asyncHandler(async (req, res) => {
     return res.status(200).send({
       message: "Node Template created successfully",
       type: "success",
+      newChat,
       prompts: [
         `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${nodeJSBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`,
       ],

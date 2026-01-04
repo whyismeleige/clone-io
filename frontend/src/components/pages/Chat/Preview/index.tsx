@@ -2,10 +2,6 @@
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
-import { useWebContainer } from "@/hooks/useWebContainer";
-import { FileItem, Step, StepType } from "@/types";
-import { BACKEND_URL } from "@/utils/config";
-import { parseXml } from "@/utils/parse-xml";
 import { WebContainer } from "@webcontainer/api";
 import {
   ExternalLink,
@@ -14,11 +10,6 @@ import {
   RefreshCcw,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-
-interface TemplateAPIResponse {
-  prompts: string[];
-  uiPrompts: string[];
-}
 
 interface PreviewFrameProps {
   webContainer: WebContainer | null;

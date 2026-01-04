@@ -26,7 +26,7 @@ export default function Auth() {
 
   const { user } = useAppSelector((state) => state.auth);
 
-  let query = searchParams.get("mode");
+  const query = searchParams.get("mode");
 
   const [mode, toggleMode] = useState<Mode>((query as Mode) || "login");
   const [email, setEmail] = useState("");

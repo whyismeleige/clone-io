@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from "react";
 import {
   Alert as AlertType,
-  AlertType as AlertTypeEnum,
 } from "@/types/alert.types"
 import {
   AlertDescription,

@@ -2,8 +2,7 @@
 import { useAppDispatch, useAppSelector } from "@/hooks/redux";
 import { fetchUserProfile } from "@/store/slices/auth.slice";
 import { useRouter } from "next/navigation";
-import { ReactNode, useEffect } from "react";
-import { Spinner } from "../ui/spinner";
+import { ReactNode, useEffect, useState } from "react";
 
 export default function ProtectedRoute({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -11,29 +10,26 @@ export default function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, accessToken, isLoading, isAuthenticated } = useAppSelector(
     (state) => state.auth
   );
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    if (accessToken && !user && !isLoading) {
-      dispatch(fetchUserProfile()).unwrap()
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && accessToken && !user && !isLoading) {
+      dispatch(fetchUserProfile()).unwrap();
     }
-  }, [accessToken, isLoading, dispatch, user]);
+  }, [accessToken, isLoading, dispatch, user, mounted]);
 
   useEffect(() => {
-    if (!isLoading && (!isAuthenticated || !accessToken)) {
+    if (mounted && !isLoading && (!isAuthenticated || !accessToken)) {
       router.replace("/");
     }
-  }, [isAuthenticated, isLoading, accessToken, router]);
+  }, [isAuthenticated, isLoading, accessToken, router, mounted]);
 
-  if (isLoading || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Spinner  />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated || !accessToken) {
-    return null;
+  if (!mounted || isLoading || !user || !isAuthenticated || !accessToken) {
+    return null; // Next.js loading.tsx will handle the loading UI
   }
 
   return <>{children}</>;

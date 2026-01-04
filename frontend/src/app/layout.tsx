@@ -3,7 +3,6 @@ import "./globals.css";
 import { Providers } from "@/utils/providers";
 import { AlertContainer } from "@/components/shared/Alert/AlertContainer";
 import AppSidebar from "@/components/pages/Chat/Sidebar";
-import { SidebarInset } from "@/components/ui/sidebar";
 
 export const metadata: Metadata = {
   title: "Clone.io",

@@ -1,9 +1,6 @@
-import Link from "next/link";
 import {
   Breadcrumb,
-  BreadcrumbEllipsis,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
@@ -11,24 +8,18 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronRight, File, FileIcon } from "lucide-react";
+import { FileIcon } from "lucide-react";
 import Editor from "@monaco-editor/react";
-import { useAppDispatch, useAppSelector } from "@/hooks/redux";
+import { useAppDispatch } from "@/hooks/redux";
 import { Fragment } from "react";
 import { useTheme } from "next-themes";
-import {
-  SidebarContent,
-  SidebarGroup,
-  SidebarMenu,
-  SidebarMenuButton,
-} from "@/components/ui/sidebar";
 import { Tree } from "./FileStructure";
+import { useChatContext } from "@/context/chat.context";
 
 export default function CodeEditor() {
-  const { currentFile, files } = useAppSelector((state) => state.chat);
+  const { currentFile } = useChatContext();
   const filePath = currentFile?.path.split("/").slice(1);
   const { theme } = useTheme();
   
@@ -54,7 +45,7 @@ export default function CodeEditor() {
 }
 
 function FilesBreadcrumb({ path }: { path?: string[] }) {
-  const { currentFile, files } = useAppSelector((state) => state.chat);
+ const { files } = useChatContext();
   const dispatch = useAppDispatch();
   
   return (
