@@ -382,3 +382,20 @@ exports.exchangeCode = async (req, res) => {
     refreshToken: authData.refreshToken,
   });
 };
+
+exports.logout = async (req, res) => {
+  const { refreshToken } = req.body;
+  
+  if (!refreshToken) {
+    throw ValidationError("Session Code required");
+  }
+
+  await User.findByIdAndUpdate(req.user._id, {
+    $pull: { refreshTokens: { token: refreshToken } },
+  });
+
+  res.status(200).send({
+    message: "Logged Out Successfully",
+    type: "success",
+  });
+};

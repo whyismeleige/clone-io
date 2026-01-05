@@ -11,11 +11,16 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { useChatContext } from "@/context/chat.context";
 import { useAppDispatch, useAppSelector } from "@/hooks/redux";
-import { loginUser, registerUser } from "@/store/slices/auth.slice";
+import {
+  loginUser,
+  registerUser,
+  TokenService,
+} from "@/store/slices/auth.slice";
 import { Eye, EyeOff, GalleryVerticalEnd } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 type Mode = "login" | "signup";
@@ -23,8 +28,9 @@ type Mode = "login" | "signup";
 export default function Auth() {
   const searchParams = useSearchParams();
   const dispatch = useAppDispatch();
+  const router = useRouter();
 
-  const { user } = useAppSelector((state) => state.auth);
+  const { prompt, newChat } = useChatContext();
 
   const query = searchParams.get("mode");
 
@@ -36,14 +42,28 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const data =
-      mode === "signup"
-        ? dispatch(registerUser({ email, password, name }))
-        : dispatch(loginUser({ email, password }));
+    try {
+      e.preventDefault();
+      setLoading(true);
 
-    setLoading(false);
+      await dispatch(
+        mode === "signup"
+          ? registerUser({ email, password, name })
+          : loginUser({ email, password })
+      ).unwrap();
+
+      const newAccessToken = TokenService.getAccessToken();
+
+      if (prompt && prompt.trim() !== "") {
+        await newChat(newAccessToken);
+      } else {
+        setTimeout(() => router.replace("/"), 2000);
+      }
+    } catch (error) {
+      console.error("Error in Auth", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

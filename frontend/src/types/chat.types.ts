@@ -1,10 +1,11 @@
 import { FileItem } from ".";
+import { User } from "./auth.types";
 
 export type TabsState = "preview" | "code";
 
 export type MessageRole = "user" | "assistant";
 
-export type StepStatus =  "pending" | "in-progress" | "completed";
+export type StepStatus = "pending" | "in-progress" | "completed";
 
 export enum StepType {
   CreateFile,
@@ -19,7 +20,7 @@ export interface Step {
   title: string;
   description: string;
   type: StepType;
-  status: StepStatus
+  status: StepStatus;
   code?: string;
   path?: string;
 }
@@ -27,6 +28,12 @@ export interface Step {
 export interface PromptMessage {
   role: MessageRole;
   content: string;
+}
+
+export interface ChatConversation {
+  role: MessageRole;
+  content: string;
+  timestamp: string;
 }
 
 export type ChatMessage =
@@ -41,15 +48,44 @@ export type ChatMessage =
       timestamp: string;
     };
 
+export interface ChatHistory {
+  _id: string;
+  projectName: string;
+  isStarred: boolean;
+  timestamp: string;
+}
+
+export interface Chat {
+  _id: string;
+  projectName: string;
+  projectS3Url?: string | null;
+  model: string;
+  conversations: ChatConversation[];
+  githubRepo?: string | null;
+  deploymentLink?: string | null;
+  visibilityStatus: "public" | "private";
+  isStarred: boolean;
+  isDeployed: boolean;
+  deployedAt?: string | null;
+  createdBy?: User | null | string;
+  lastActivity: string;
+  status: "active" | "archived" | "deleted";
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ChatContextType {
   prompt: string;
   setPrompt: (value: string) => void;
-  projectTitle: string;
+  handleSendPrompt: () => void;
+  currentChat: Chat | null;
   tabsState: TabsState;
   currentFile: FileItem | null;
   files: FileItem[];
-  newChat: () => Promise<void>;
+  newChat: (newAccessToken?: string | null) => Promise<void>;
   changeCurrentFile: (file: FileItem) => void;
   toggleTabsState: (toggle: TabsState) => void;
-  messages: ChatMessage[]
+  messages: ChatMessage[];
+  chatHistory: ChatHistory[];
+  fetchChatsHistory: () => Promise<void>;
 }

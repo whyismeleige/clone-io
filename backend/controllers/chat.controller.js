@@ -1,4 +1,5 @@
 const { Anthropic } = require("@anthropic-ai/sdk");
+const { sanitizeUser } = require("../utils/auth.utils");
 const { BASE_PROMPT, getSystemPrompt } = require("../utils/prompts/index");
 const { reactJSBasePrompt } = require("../utils/prompts/defaults/react");
 const { nodeJSBasePrompt } = require("../utils/prompts/defaults/node");
@@ -6,6 +7,7 @@ const asyncHandler = require("../middleware/asyncHandler");
 const db = require("../models");
 const { ValidationError, ExternalAPIError } = require("../utils/errors.utils");
 const { dummyPromptData } = require("../utils/dummyData");
+const { uploadS3File } = require("../utils/s3.utils");
 const anthropic = new Anthropic();
 
 const User = db.user;
@@ -30,10 +32,17 @@ const handleClaudeErrors = (error) => {
 exports.getChats = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id).populate("chats");
 
+  const chats = user.chats.map((chat) => ({
+    _id: chat._id,
+    projectName: chat.projectName,
+    isStarred: chat.isStarred,
+    timestamp: chat.createdAt,
+  }));
+
   res.status(200).send({
     message: "Chats retrieved successfully",
     type: "success",
-    chats: user.chats,
+    chats,
   });
 });
 
@@ -93,9 +102,9 @@ exports.sendPrompt = asyncHandler(async (req, res) => {
       // Simulate streaming text in chunks
       const chunkSize = 50;
       for (let i = 0; i < fullText.length; i += chunkSize) {
-        const length = Math.min(fullText.length - 1, i+chunkSize);
+        const length = Math.min(fullText.length - 1, i + chunkSize);
         const chunk = fullText.slice(i, length);
-        
+
         res.write(
           `data: ${JSON.stringify({
             type: "text_block",
@@ -249,6 +258,8 @@ exports.createTemplate = asyncHandler(async (req, res) => {
     createdBy: req.user._id,
   });
 
+  await req.user.saveChat(newChat._id);
+
   if (projectType === "react") {
     return res.status(200).send({
       message: "React Template created successfully",
@@ -275,4 +286,60 @@ exports.createTemplate = asyncHandler(async (req, res) => {
   }
 
   throw new ExternalAPIError(`Unexpected Response. Please Try Again`);
+});
+
+exports.fetchChat = asyncHandler(async (req, res) => {
+  const chatId = req.query.id;
+
+  const chat = await Chat.findById(chatId).populate({
+    path: "createdBy",
+    transform: (doc) => {
+      if (!doc) return;
+      sanitizeUser(doc);
+    },
+  });
+
+  if (!chat) {
+    throw new ValidationError("Chat does not exist");
+  }
+
+  res.status(200).send({
+    message: "Chat retrieved successfully",
+    type: "success",
+    chat,
+  });
+});
+
+exports.uploadProjectToS3 = asyncHandler(async (req, res) => {
+  const chatId = req.query.id;
+  const { files } = req.body;
+  const userId = req.user._id;
+
+  if (!files || !chatId || !Array.isArray(files)) {
+    throw new ValidationError("Chat and Project Files are required for upload");
+  }
+
+  const chat = await Chat.findById(chatId);
+
+  if (!chat) {
+    throw new ValidationError("Chat does not exist");
+  }
+
+  const uploadPromises = files.map(async (file) => {
+    const key = `users/${userId}/chats/${chatId}/${file.path}`;
+    const metadata = { chatId, userId, timestamp: new Date().toISOString() };
+    const url = await uploadS3File(key, file, metadata);
+
+    return { key, url };
+  });
+
+  const projectFiles = await Promise.all(uploadPromises);
+
+  await chat.saveProjectFiles(projectFiles);
+
+  res.status(200).send({
+    message: "Project Files saved successfully",
+    type: "success",
+    projectFiles
+  });
 });

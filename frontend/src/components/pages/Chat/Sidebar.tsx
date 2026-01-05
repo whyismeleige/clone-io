@@ -1,5 +1,7 @@
-"use client"
+"use client";
+import UserDropdown from "@/components/shared/Dropdown/UserDropdown";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   Collapsible,
   CollapsibleContent,
@@ -25,14 +27,20 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
-  SidebarMenuSubButton,
   SidebarMenuSubItem,
-  SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useChatContext } from "@/context/chat.context";
 import { useAppSelector } from "@/hooks/redux";
+import { useMounted } from "@/hooks/useMounted";
 import { User } from "@/types/auth.types";
-import { SiAnthropic } from "@icons-pack/react-simple-icons";
+import { ChatHistory } from "@/types/chat.types";
+import { SiAnthropic, SiGithub } from "@icons-pack/react-simple-icons";
 import {
   Bell,
   CreditCard,
@@ -45,14 +53,34 @@ import {
   UserCircle,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+
+const dummyChatHistory: ChatHistory[] = Array(100)
+  .fill(null)
+  .map(() => ({
+    _id: "UUID-" + Math.floor(Math.random() * 100).toString(),
+    projectName: "Project-" + Math.floor(Math.random() * 100).toString(),
+    isStarred: Math.floor(Math.random() * 100) <= 50,
+    timestamp: new Date().toISOString(),
+  }));
+
 export default function AppSidebar() {
-   const {user} = useAppSelector((state) => state.auth )
-   const [mounted, setMounted] = useState(false);
+  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { fetchChatsHistory, chatHistory } = useChatContext();
+  const isMounted = useMounted();
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    if (isMounted && isAuthenticated) {
+      fetchChatsHistory();
+    }
+  }, [isMounted, isAuthenticated, fetchChatsHistory]);
+
+  const sortedChats = chatHistory.sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
+  const starredChats = sortedChats.filter((chat) => chat.isStarred);
+  const nonStarredChats = sortedChats.filter((chat) => !chat.isStarred);
+
   return (
     <Sidebar>
       <SidebarHeader>
@@ -67,15 +95,46 @@ export default function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="custom-scrollbar">
         <NavCreate />
-        <NavFavorites />
-        <NavSecondary />
+        {isMounted && isAuthenticated ? (
+          <div className="overflow-y-auto custom-scrollbar">
+            {starredChats.length > 0 && <NavStarred chats={starredChats} />}
+            {nonStarredChats.length > 0 && (
+              <NavRecent chats={nonStarredChats} />
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center px-4 py-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              Please log in or sign up to use Clone IO
+            </p>
+          </div>
+        )}
       </SidebarContent>
+
       <SidebarFooter>
-        <NavUser user={mounted ? user : null}/>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              className="flex items-center justify-center m-2 gap-2 rounded-md border px-4 py-2 text-sm hover:bg-accent"
+            >
+              <Link
+                href="https://github.com/whyismeleige/clone-io"
+                className="flex gap-2 items-center justify-center px-4 py-2"
+              >
+                <SiGithub />
+                Clone.io GitHub
+              </Link>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Github Repository</TooltipContent>
+        </Tooltip>
+        {isMounted && isAuthenticated && (
+          <NavUser user={isMounted ? user : null} />
+        )}
       </SidebarFooter>
-      <SidebarRail />
     </Sidebar>
   );
 }
@@ -100,27 +159,29 @@ const NavCreate = () => {
   );
 };
 
-const NavFavorites = () => {
+const NavStarred = ({ chats }: { chats: ChatHistory[] }) => {
   return (
-    <SidebarGroup>
+    <SidebarGroup className="py-0">
       <SidebarGroupContent>
         <SidebarMenu>
           <Collapsible defaultOpen={true} className="group/collapsible">
             <SidebarMenuItem>
               <CollapsibleTrigger asChild>
-                <SidebarMenuButton>
-                  Favorites{" "}
+                <SidebarMenuButton className="cursor-pointer">
+                  Starred{" "}
                   <Plus className="ml-auto group-data-[state=open]/collapsible:hidden" />
                   <Minus className="ml-auto group-data-[state=closed]/collapsible:hidden" />
                 </SidebarMenuButton>
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <SidebarMenuSub>
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton isActive={true}>
-                      Fast Refresh
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
+                  {chats.map((chat, index) => (
+                    <Link href={`/chat/${chat._id}`} key={index}>
+                      <SidebarMenuSubItem className="p-2 text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent rounded-lg cursor-pointer">
+                        {chat.projectName}
+                      </SidebarMenuSubItem>
+                    </Link>
+                  ))}
                 </SidebarMenuSub>
               </CollapsibleContent>
             </SidebarMenuItem>
@@ -131,26 +192,40 @@ const NavFavorites = () => {
   );
 };
 
-const NavSecondary = () => {
+const NavRecent = ({ chats }: { chats: ChatHistory[] }) => {
   return (
-    <SidebarGroup className="mt-auto">
+    <SidebarGroup className="py-0">
       <SidebarGroupContent>
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href="/">
-                <Settings />
-                <span>Settings</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          <Collapsible defaultOpen={true} className="group/collapsible">
+            <SidebarMenuItem>
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton className="cursor-pointer">
+                  Recent{" "}
+                  <Plus className="ml-auto group-data-[state=open]/collapsible:hidden" />
+                  <Minus className="ml-auto group-data-[state=closed]/collapsible:hidden" />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarMenuSub>
+                  {chats.map((chat, index) => (
+                    <Link href={`/chat/${chat._id}`} key={index}>
+                      <SidebarMenuSubItem className="p-2 text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent rounded-lg cursor-pointer">
+                        {chat.projectName}
+                      </SidebarMenuSubItem>
+                    </Link>
+                  ))}
+                </SidebarMenuSub>
+              </CollapsibleContent>
+            </SidebarMenuItem>
+          </Collapsible>
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
   );
 };
 
-const NavUser = ({user} : {user: User | null}) => {
+const NavUser = ({ user }: { user: User | null }) => {
   const { isMobile } = useSidebar();
   return (
     <SidebarMenu>
@@ -174,47 +249,12 @@ const NavUser = ({user} : {user: User | null}) => {
               <EllipsisVertical className="ml-auto size-4" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
+          <UserDropdown
             className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
             side={isMobile ? "bottom" : "right"}
             align="end"
             sideOffset={4}
-          >
-            <DropdownMenuLabel className="p-0 font-normal">
-              <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage src={user?.avatar} alt={user?.name}/>
-                  <AvatarFallback className="rounded-lg">CN</AvatarFallback>
-                </Avatar>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{user?.name}</span>
-                  <span className="text-muted-foreground truncate text-xs">
-                    {user?.email}
-                  </span>
-                </div>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <UserCircle />
-                Account
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CreditCard />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Bell />
-                Notifications
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <LogOut />
-              Log out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
+          />
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>

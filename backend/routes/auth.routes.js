@@ -1,5 +1,6 @@
 const express = require("express");
 const controller = require("../controllers/auth.controller");
+const { authenticateToken } = require("../middleware/auth.middleware");
 
 const router = express.Router();
 
@@ -13,4 +14,7 @@ router.get("/github", controller.githubAuth);
 router.get("/github/callback", controller.githubCallback);
 
 router.post("/exchange-code", controller.exchangeCode);
+
+router.post("/logout", authenticateToken, controller.logout);
+
 module.exports = router;

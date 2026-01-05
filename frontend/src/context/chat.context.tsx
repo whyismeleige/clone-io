@@ -1,21 +1,26 @@
 "use client";
 import { useAppSelector } from "@/hooks/redux";
-import { useWebContainer } from "@/hooks/useWebContainer";
+import { useMounted } from "@/hooks/useMounted";
 import { FileItem, Step, StepType } from "@/types";
 import {
+  Chat,
   ChatContextType,
+  ChatHistory,
   ChatMessage,
   PromptMessage,
   TabsState,
 } from "@/types/chat.types";
 import { BACKEND_URL } from "@/utils/config";
 import { parseXml, StreamingXmlParser } from "@/utils/parse-xml";
+import { useRouter } from "next/navigation";
 import {
   createContext,
   FC,
   ReactNode,
+  useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -41,13 +46,48 @@ const getInitialFile = (nodes: FileItem[]): FileItem => {
   return nodes[0].children ? getInitialFile(nodes[0].children) : nodes[0];
 };
 
+const flattenFileStructure = (
+  files: FileItem[],
+  result: Array<{ path: string; content: string }> = []
+) => {
+  for (const file of files) {
+    if (file.type === "file" && file.content !== undefined) {
+      result.push({
+        path: file.path.startsWith("/") ? file.path.slice(1) : file.path,
+        content: file.content,
+      });
+    } else if (file.type === "folder" && file.children) {
+      flattenFileStructure(file.children, result);
+    }
+  }
+  return result;
+};
+
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  const isMounted = useMounted();
+  const router = useRouter();
+
   const { accessToken } = useAppSelector((state) => state.auth);
 
-  const [prompt, setPrompt] = useState<string>("Make a compact website");
-  const [projectTitle, setProjectTitle] = useState<string>("");
+  const [prompt, setPrompt] = useState<string>("");
+
+  useEffect(() => {
+    if (isMounted) {
+      const savedPrompt = localStorage.getItem("chatPrompt") || "";
+      setPrompt(savedPrompt);
+    }
+  }, [isMounted]);
+
+  useEffect(() => {
+    if (isMounted && prompt) {
+      localStorage.setItem("chatPrompt", prompt);
+    }
+  }, [prompt, isMounted]);
+
+  const [currentChat, setCurrentChat] = useState<Chat | null>(null);
+  const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
   const [tabsState, toggleTabsState] = useState<TabsState>("code");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -115,9 +155,76 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     });
   };
 
-  // Start of the New Chat
-  const newChat = async () => {
+  // Upload files to S3
+  const uploadToS3 = useCallback(
+    async (newAccessToken?: string | null) => {
+      const authToken = accessToken || newAccessToken;
+
+      console.log("The files are", files);
+      console.log("The current chat are", currentChat);
+
+      if (!currentChat || !authToken || files.length === 0) {
+        console.log("Cannot upload: missing chat, token, or files");
+        return;
+      }
+
+      const flattenedFiles = flattenFileStructure(files);
+
+      console.log("The flattened files are", flattenedFiles);
+      // try {
+      //   const response = await fetch(
+      //     `${BACKEND_URL}/api/chat/upload-project-files?id=${currentChat._id}`,
+      //     {
+      //       method: "POST",
+      //       headers: {
+      //         Authorization: `Bearer ${authToken}`,
+      //         "Content-Type": `application/json`,
+      //       },
+      //     }
+      //   );
+      // } catch (error) {}
+    },
+    [files, currentChat, accessToken]
+  );
+
+  // Fetch Chats List
+  const fetchChatsHistory = useCallback(async () => {
     try {
+      const response = await fetch(`${BACKEND_URL}/api/chat/list`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.type !== "success") throw Error(data.message);
+
+      setChatHistory(data.chats);
+    } catch (error) {
+      console.error("Error in fetching chats list", error);
+    }
+  }, [accessToken]);
+
+  // Fetch Single Chat by Id
+  const fetchSingleChat = async (chatId: string) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/chat/${chatId}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      const data = await response.json();
+    } catch (error) {
+      console.error("Error in fetching chat", error);
+    }
+  };
+
+  // Start of the New Chat
+  const newChat = async (newAccessToken?: string | null) => {
+    try {
+      if (!newAccessToken && !accessToken) return;
       // Add the User Message
       setMessages((prev) => [
         ...prev,
@@ -132,10 +239,10 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       const response = await fetch(`${BACKEND_URL}/api/chat/template`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${accessToken || newAccessToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ prompt: "Hello World" }),
+        body: JSON.stringify({ prompt }),
       });
 
       const data = await response.json();
@@ -143,6 +250,8 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       if (data.type !== "success") throw new Error(data.message);
 
       const { prompts, uiPrompts, newChat } = data;
+
+      router.replace(`/chat/${newChat._id}?new=true`);
 
       // Parse the UI Prompt
       const initialSteps: Step[] = parseXml(uiPrompts[0]).map((step: Step) => ({
@@ -165,18 +274,24 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
           timestamp: new Date().toISOString(),
         },
       ]);
-      setProjectTitle(newChat._id);
+      setCurrentChat(newChat);
+      setPrompt("");
 
       // Send the prompt for The Customization of the message
-      await sendPrompt(newChat._id, messages);
+      await sendPrompt(newChat._id, messages, newAccessToken);
     } catch (error) {
       console.error("Error in Creating New Chat");
     }
   };
 
   // Send the prompt to AI Assistant
-  const sendPrompt = async (chatId: string, messages: PromptMessage[]) => {
+  const sendPrompt = async (
+    chatId: string | undefined,
+    messages: PromptMessage[],
+    newAccessToken?: string | null
+  ) => {
     try {
+      if (!accessToken && !newAccessToken) return;
       // New Parser to Parse the Streaming XML Content
       const parser = new StreamingXmlParser();
 
@@ -184,7 +299,7 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       const stream = await fetch(`${BACKEND_URL}/api/chat/prompt`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${accessToken || newAccessToken}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ messages, chatId }),
@@ -222,11 +337,7 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
                     break;
 
                   case "done":
-                    console.log("Last data", data);
-
-                    // Get all parsed steps at the end
-                    const allSteps = parser.getAllSteps();
-                    console.log("Final steps:", allSteps);
+                    uploadToS3();
                     break;
 
                   case "error":
@@ -245,6 +356,24 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     }
   };
 
+  const handleSendPrompt = async () => {
+    try {
+      const newMessages: ChatMessage[] = [
+        ...messages,
+        {
+          role: "user",
+          content: prompt,
+          timestamp: new Date().toISOString(),
+        },
+      ];
+      setMessages(newMessages);
+      
+      ``
+    } catch (error) {
+      console.error("Error sending prompt");
+    }
+  };
+
   useEffect(() => {
     const steps = getLatestSteps();
     const pendingSteps = steps.filter(({ status }) => status === "pending");
@@ -253,7 +382,7 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
     // Deep clone to avoid mutation issues
     const updatedFiles = JSON.parse(JSON.stringify(files));
-
+    console.log("The updated files are", files);
     pendingSteps.forEach((step) => {
       if (step?.type === StepType.CreateFile) {
         const parsedPath = step.path?.split("/").filter(Boolean) ?? [];
@@ -318,7 +447,8 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const value: ChatContextType = {
     prompt,
     setPrompt,
-    projectTitle,
+    handleSendPrompt,
+    currentChat,
     tabsState,
     changeCurrentFile,
     currentFile,
@@ -326,6 +456,8 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     newChat,
     toggleTabsState,
     messages,
+    chatHistory,
+    fetchChatsHistory,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

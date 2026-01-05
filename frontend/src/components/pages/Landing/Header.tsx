@@ -2,7 +2,18 @@
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Menu, X } from "lucide-react";
+import {
+  Bell,
+  HelpCircle,
+  LogOut,
+  Menu,
+  Monitor,
+  Moon,
+  Settings,
+  Sun,
+  UserCircle,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/ui/mode-toggle";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -11,10 +22,32 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAppSelector } from "@/hooks/redux";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import UserDropdown from "@/components/shared/Dropdown/UserDropdown";
 
 export const HeroHeader = () => {
+  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+
   const [menuState, setMenuState] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -73,26 +106,42 @@ export const HeroHeader = () => {
                   </TooltipTrigger>
                   <TooltipContent>Toggle Theme</TooltipContent>
                 </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button asChild variant="outline" size="sm">
-                      <Link href="/auth?mode=login">
-                        <span>Login</span>
-                      </Link>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Login</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button asChild size="sm">
-                      <Link href="/auth?mode=signup">
-                        <span>Sign Up</span>
-                      </Link>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Sign Up</TooltipContent>
-                </Tooltip>
+                {!isMounted ? (
+                  <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
+                ) : isAuthenticated ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Avatar className="cursor-pointer">
+                        <AvatarImage src={user?.avatar} alt={user?.name} />
+                        <AvatarFallback>CN</AvatarFallback>
+                      </Avatar>
+                    </DropdownMenuTrigger>
+                    <UserDropdown className="w-60" />
+                  </DropdownMenu>
+                ) : (
+                  <>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button asChild variant="outline" size="sm">
+                          <Link href="/auth?mode=login">
+                            <span>Login</span>
+                          </Link>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Login</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button asChild size="sm">
+                          <Link href="/auth?mode=signup">
+                            <span>Sign Up</span>
+                          </Link>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Sign Up</TooltipContent>
+                    </Tooltip>
+                  </>
+                )}
               </div>
             </div>
           </div>

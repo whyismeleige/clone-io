@@ -38,7 +38,7 @@ import {
   Pen,
   Copy,
   Blend,
-Download,
+  Download,
   Play,
   Code,
   UserCircle,
@@ -54,6 +54,12 @@ import { useState } from "react";
 import { FileItem } from "@/types";
 import { Spinner } from "@/components/ui/spinner";
 import { useChatContext } from "@/context/chat.context";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import UserDropdown from "@/components/shared/Dropdown/UserDropdown";
 
 const zipFoldersRecursive = (files?: FileItem[], folder?: JSZip | null) => {
   files?.forEach((item) => {
@@ -67,12 +73,11 @@ const zipFoldersRecursive = (files?: FileItem[], folder?: JSZip | null) => {
 };
 
 export default function AppHeader() {
-
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
 
   const { user } = useAppSelector((state) => state.auth);
-  const {files, toggleTabsState} = useChatContext();
+  const { files, toggleTabsState, currentChat } = useChatContext();
 
   const downloadZipFiles = async () => {
     try {
@@ -122,7 +127,7 @@ export default function AppHeader() {
               variant="outline"
               className="cursor-pointer"
             >
-              Sample Project Title
+              {currentChat?.projectName}
               <LockIcon />
               <ChevronDown />
             </Button>
@@ -147,10 +152,10 @@ export default function AppHeader() {
         </DropdownMenu>
         <div className="w-1/2 mx-auto flex justify-center">
           <Tabs defaultValue="code">
-            <TabsList>
+            <TabsList className="bg-transparent">
               <TabsTrigger
                 onClick={() => toggleTabsState("preview")}
-                className="cursor-pointer"
+                className="cursor-pointer p-3"
                 value="preview"
               >
                 <Play />
@@ -158,7 +163,7 @@ export default function AppHeader() {
               </TabsTrigger>
               <TabsTrigger
                 onClick={() => toggleTabsState("code")}
-                className="cursor-pointer"
+                className="cursor-pointer p-3"
                 value="code"
               >
                 <Code />
@@ -169,104 +174,47 @@ export default function AppHeader() {
         </div>
         <div className="ml-auto flex items-center gap-2">
           <ModeToggle />
-          <Button
-            disabled={loading && status === "Downloading..."}
-            variant="outline"
-            onClick={downloadZipFiles}
-            size="sm"
-            className="cursor-pointer hidden sm:flex"
-          >
-            {loading && status === "Downloading..." ? (
-              <Spinner />
-            ) : (
-              <Download />
-            )}
-            {loading && status === "Downloading..." ? status : "Export"}
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                disabled={loading && status === "Downloading..."}
+                variant="outline"
+                onClick={downloadZipFiles}
+                size="sm"
+                className="cursor-pointer hidden sm:flex"
+              >
+                {loading && status === "Downloading..." ? (
+                  <Spinner />
+                ) : (
+                  <Download />
+                )}
+                {loading && status === "Downloading..." ? status : "Export"}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Download your Project</TooltipContent>
+          </Tooltip>
           {/* <GithubDialog /> */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="cursor-pointer hidden sm:flex"
-          >
-            <Globe />
-            Deploy
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="cursor-pointer hidden sm:flex"
+              >
+                <Globe />
+                Deploy
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Deploy your Website</TooltipContent>
+          </Tooltip>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Avatar className="cursor-pointer">
-                <AvatarImage
-                  src={user?.avatar}
-                  alt={user?.name}
-                />
+                <AvatarImage src={user?.avatar} alt={user?.name} />
                 <AvatarFallback>CN</AvatarFallback>
               </Avatar>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-60">
-              <DropdownMenuGroup>
-                <DropdownMenuLabel className="p-0 font-normal">
-                  <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                    <Avatar className="h-8 w-8 rounded-lg">
-                      <AvatarImage src={user?.avatar} />
-                      <AvatarFallback className="rounded-lg">CN</AvatarFallback>
-                    </Avatar>
-                    <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-medium">{user?.name}</span>
-                      <span className="text-muted-foreground truncate text-xs">
-                        {user?.email}
-                      </span>
-                    </div>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                  <DropdownMenuItem className="cursor-pointer">
-                    <Settings />
-                    Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <HelpCircle />
-                    Get Help
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                  <DropdownMenuItem className="cursor-pointer">
-                    <UserCircle />
-                    Account
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Bell />
-                    Notifications
-                  </DropdownMenuItem>
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
-                      <Moon />
-                      Theme
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent>
-                      <DropdownMenuItem>
-                        <Sun />
-                        Light
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Moon />
-                        Dark
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Monitor />
-                        System
-                      </DropdownMenuItem>
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <LogOut />
-                  Log out
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
+            <UserDropdown className="w-60"/>
           </DropdownMenu>
         </div>
       </div>
@@ -309,11 +257,7 @@ export default function AppHeader() {
 //   );
 // };
 
-const RenameProject = ({
-  title,
-}: {
-  title: string;
-}) => {
+const RenameProject = ({ title }: { title: string }) => {
   const [input, setInput] = useState(title);
   return (
     <Dialog>
@@ -351,12 +295,7 @@ const RenameProject = ({
             </Button>
           </DialogClose>
           <DialogClose asChild>
-            <Button
-              className="cursor-pointer"
-              
-            >
-              Save Changes
-            </Button>
+            <Button className="cursor-pointer">Save Changes</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>

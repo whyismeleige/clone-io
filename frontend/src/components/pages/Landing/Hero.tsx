@@ -1,9 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import {
-  ArrowUp,
-  PlusIcon,
-} from "lucide-react";
+import { ArrowUp, PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TextEffect } from "@/components/motion-primitives/text-effect";
 import {
@@ -21,9 +18,9 @@ import {
 import { Kbd } from "@/components/ui/kbd";
 import { ModelCombobox } from "@/components/shared/ModelCombobox";
 import { useAppSelector } from "@/hooks/redux";
-import { useDispatch } from "react-redux";
 import { useRouter } from "next/navigation";
 import { useChatContext } from "@/context/chat.context";
+import { Spinner } from "@/components/ui/spinner";
 
 const phrases = [
   `Recreate the minimal, clean style of https://www.notion.so for a productivity tool website.`,
@@ -41,9 +38,10 @@ const phrases = [
 export default function HeroMain() {
   const [placeholder, setPlaceholder] = useState("");
   const [showTabBtn, toggleShowTabBtn] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const { isAuthenticated } = useAppSelector((state) => state.auth);
-  const { prompt, setPrompt } = useChatContext();
+  const { prompt, setPrompt, newChat } = useChatContext();
   const router = useRouter();
 
   useEffect(() => {
@@ -85,7 +83,7 @@ export default function HeroMain() {
     const handleKeyDown = (e: globalThis.KeyboardEvent) => {
       if (e.key === "Tab") {
         e.preventDefault();
-        setPrompt(phraseToSet)
+        setPrompt(phraseToSet);
       }
     };
 
@@ -97,9 +95,18 @@ export default function HeroMain() {
     };
   }, [prompt, setPrompt]);
 
-  const handlePrompt = () => {
-    if(!isAuthenticated) {
-      router.push("/auth?mode=Login")
+  const handlePrompt = async () => {
+    try {
+      setLoading(true);
+      if (isAuthenticated) {
+        await newChat();
+      } else {
+        router.replace("/auth?mode=login");
+      }
+    } catch (error) {
+      console.error("Error in Starting New Chat", error);
+    } finally {
+      setLoading(false);
     }
   };
   return (
@@ -154,13 +161,6 @@ export default function HeroMain() {
                     </div>
                   )}
                   <InputGroupAddon align="block-end">
-                    <InputGroupButton
-                      variant="outline"
-                      className="rounded-full cursor-pointer"
-                      size="icon-xs"
-                    >
-                      <PlusIcon />
-                    </InputGroupButton>
                     <ModelCombobox />
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -169,9 +169,9 @@ export default function HeroMain() {
                           className="ml-auto rounded-full cursor-pointer"
                           size="icon-xs"
                           onClick={handlePrompt}
-                          disabled={!prompt}
+                          disabled={!prompt || loading}
                         >
-                          <ArrowUp />
+                          {loading ? <Spinner /> : <ArrowUp />}
                         </InputGroupButton>
                       </TooltipTrigger>
                       <TooltipContent>Send</TooltipContent>

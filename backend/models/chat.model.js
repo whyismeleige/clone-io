@@ -12,6 +12,20 @@ const ChatSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    projectFiles: [
+      {
+        key: {
+          type: String,
+          trim: true,
+          required: true,
+        },
+        url: {
+          type: String,
+          trim: true,
+          required: true,
+        },
+      },
+    ],
     model: {
       type: String,
       trim: true,
@@ -64,6 +78,10 @@ const ChatSchema = new mongoose.Schema(
       enum: ["public", "private"],
       default: "private",
     },
+    isStarred: {
+      type: Boolean,
+      default: false,
+    },
     isDeployed: {
       type: Boolean,
       default: false,
@@ -95,9 +113,14 @@ ChatSchema.index({ createdBy: 1, createdAt: -1 });
 ChatSchema.index({ projectName: "text" });
 
 ChatSchema.methods.saveConversation = async function (role, content) {
-  this.conversations.push({role, content});
+  this.conversations.push({ role, content });
   await this.save();
-}
+};
+
+ChatSchema.methods.saveProjectFiles = async function (files) {
+  this.projectFiles = files;
+  return await this.save();
+};
 
 ChatSchema.pre("save", function () {
   if (this.isModified("conversation")) {

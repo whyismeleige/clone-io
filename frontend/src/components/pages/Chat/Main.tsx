@@ -13,11 +13,28 @@ import { FileItem } from "@/types";
 import { useWebContainer } from "@/hooks/useWebContainer";
 import { cn } from "@/lib/utils";
 import { useChatContext } from "@/context/chat.context";
+import { useParams, useSearchParams } from "next/navigation";
+import { useMounted } from "@/hooks/useMounted";
 
 export default function AppMain() {
-  const { tabsState, files, newChat } = useChatContext();
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const chatId = params?.id as string;
+  const isNewChat = searchParams.get("new") === "true";
 
+  const { tabsState, files, newChat } = useChatContext();
   const { webcontainer, error } = useWebContainer();
+  const isMounted = useMounted();
+
+  useEffect(() => {
+    const intializeChat = async () => {
+      if(!isMounted) return;
+
+      
+    }
+
+    intializeChat();
+  }, []);
 
   useEffect(() => {
     const createMountStructure = (files: FileItem[]): Record<string, any> => {
@@ -58,10 +75,6 @@ export default function AppMain() {
     const mountStructure = createMountStructure(files);
     webcontainer?.mount(mountStructure);
   }, [webcontainer, files]);
-
-  useEffect(() => {
-    newChat();
-  },[])
 
   return (
     <div className="flex w-screen flex-col h-screen">

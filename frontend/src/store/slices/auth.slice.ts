@@ -2,7 +2,7 @@ import { AuthState } from "@/types/auth.types";
 import { BACKEND_URL } from "@/utils/config";
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 
-const TokenService = {
+export const TokenService = {
   getAccessToken: () => {
     if (typeof window === "undefined") return null;
     return localStorage.getItem("accessToken");
@@ -64,6 +64,8 @@ export const registerUser = createAsyncThunk(
       });
 
       const data = await response.json();
+
+      console.log("The data is", data);
 
       if (data.type !== "success") {
         return rejectWithValue(data.message);
@@ -223,6 +225,37 @@ export const exchangeOAuthCode = createAsyncThunk(
   }
 );
 
+export const logoutUser = createAsyncThunk(
+  "auth/logout",
+  async (_, { rejectWithValue }) => {
+    try {
+      const accessToken = TokenService.getAccessToken();
+      const refreshToken = TokenService.getRefreshToken();
+
+      const response = await fetch(`${BACKEND_URL}/api/auth/logout`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      const data = await response.json();
+
+      if (data.type !== "success") {
+        return rejectWithValue(data.message);
+      }
+
+      return data;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Error Logging Out";
+      return rejectWithValue(message);
+    }
+  }
+);
+
 export const authSlice = createSlice({
   name: "auth",
   initialState,
@@ -337,6 +370,26 @@ export const authSlice = createSlice({
       })
       .addCase(exchangeOAuthCode.rejected, (state, action) => {
         state.isLoading = false;
+        state.error = action.payload as string;
+      });
+    // Logout Current Session
+    builder
+      .addCase(logoutUser.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(logoutUser.fulfilled, (state, action) => {
+        state.isAuthenticated = false;
+        state.user = null;
+        state.accessToken = null;
+        state.error = null;
+        state.isLoading = false;
+      })
+      .addCase(logoutUser.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isAuthenticated = false;
+        state.user = null;
+        state.accessToken = null;
         state.error = action.payload as string;
       });
   },

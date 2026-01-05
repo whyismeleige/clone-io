@@ -41,9 +41,6 @@ const UserSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: function () {
-        return this.providers.includes("local");
-      },
       minlength: [8, "Password must be at least 8 characters"],
       select: false,
     },
@@ -174,6 +171,11 @@ UserSchema.methods.saveToken = async function (token, metadata) {
   this.refreshTokens = [...this.refreshTokens, { token, metadata }];
   return await this.save();
 };
+
+UserSchema.methods.saveChat = async function (chatId) {
+  this.chats.push(chatId);
+  return await this.save();
+}
 
 UserSchema.methods.successfulLogin = async function (metadata) {
   this.activity.lastLogin = Date.now();

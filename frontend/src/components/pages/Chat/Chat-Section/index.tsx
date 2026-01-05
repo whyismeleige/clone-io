@@ -9,31 +9,13 @@ import {
   InputGroupTextarea,
 } from "@/components/ui/input-group";
 import { Spinner } from "@/components/ui/spinner";
-import { ArrowUp, CircleCheckBig, PlusIcon } from "lucide-react";
-import { useState } from "react";
+import { ArrowUp, CircleCheckBig } from "lucide-react";
 import { useChatContext } from "@/context/chat.context";
-import { useAppSelector } from "@/hooks/redux";
 
 export default function ChatSection() {
-  const { user } = useAppSelector((state) => state.auth);
-  const { messages } = useChatContext();
+  const { messages, prompt, setPrompt, handleSendPrompt } = useChatContext();
   return (
     <section className="flex flex-col h-full">
-      {/* <div className="flex justify-between p-2 shrink-0">
-        <ButtonGroup>
-          <Button variant="outline" className="cursor-pointer">
-            New Chat
-            <ChevronDown />
-          </Button>
-          <ButtonGroupSeparator />
-          <Button size="icon" className="cursor-pointer" variant="outline">
-            <Plus />
-          </Button>
-        </ButtonGroup>
-        <Button size="icon" className="cursor-pointer" variant="outline">
-          <History />
-        </Button>
-      </div> */}
       <div className="overflow-y-auto flex-1 px-2 custom-scrollbar">
         {messages.map((message, index) =>
           message.role === "user" ? (
@@ -92,13 +74,20 @@ export default function ChatSection() {
           )
         )}
       </div>
-      <InputBox />
+      <InputBox prompt={prompt} setPrompt={setPrompt} sendPrompt={handleSendPrompt} />
     </section>
   );
 }
 
-function InputBox() {
-  const [prompt, setPrompt] = useState("");
+function InputBox({
+  prompt,
+  setPrompt,
+  sendPrompt
+}: {
+  prompt: string;
+  setPrompt: (value: string) => void;
+  sendPrompt: () => void;
+}) {
   return (
     <InputGroup>
       <InputGroupTextarea
@@ -107,18 +96,12 @@ function InputBox() {
         onChange={(e) => setPrompt(e.target.value)}
       />
       <InputGroupAddon align="block-end">
-        <InputGroupButton
-          variant="outline"
-          className="rounded-full cursor-pointer"
-          size="icon-xs"
-        >
-          <PlusIcon />
-        </InputGroupButton>
         <ModelCombobox />
         <InputGroupButton
           variant="default"
           className="ml-auto rounded-full cursor-pointer"
           size="icon-xs"
+          onClick={sendPrompt}
           disabled={!prompt}
         >
           <ArrowUp />

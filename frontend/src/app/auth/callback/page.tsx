@@ -1,7 +1,8 @@
 "use client";
 import { Spinner } from "@/components/ui/spinner";
+import { useChatContext } from "@/context/chat.context";
 import { useAppDispatch } from "@/hooks/redux";
-import { exchangeOAuthCode } from "@/store/slices/auth.slice";
+import { exchangeOAuthCode, TokenService } from "@/store/slices/auth.slice";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -10,6 +11,7 @@ export default function AuthCallback() {
   const dispatch = useAppDispatch();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const { prompt, newChat } = useChatContext();
 
   useEffect(() => {
     const code = searchParams.get("code");
@@ -23,6 +25,13 @@ export default function AuthCallback() {
     const handleOAuthExchange = async () => {
       try {
         await dispatch(exchangeOAuthCode(code)).unwrap();
+
+        const newAccessToken = TokenService.getAccessToken();
+        if (prompt && prompt.trim() !== "") {
+          await newChat(newAccessToken);
+        } else {
+          setTimeout(() => router.replace("/"), 2000);
+        }
       } catch (error) {
         setError(
           typeof error === "string"
