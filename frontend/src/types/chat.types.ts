@@ -82,10 +82,22 @@ export interface ChatContextType {
   tabsState: TabsState;
   currentFile: FileItem | null;
   files: FileItem[];
-  newChat: (newAccessToken?: string | null) => Promise<void>;
+  newChat: (newAccessToken?: string | null, savedPrompt?: string) => Promise<void>;
   changeCurrentFile: (file: FileItem) => void;
   toggleTabsState: (toggle: TabsState) => void;
   messages: ChatMessage[];
   chatHistory: ChatHistory[];
   fetchChatsHistory: () => Promise<void>;
+  changeChatDetails: (
+    data: {
+      toggleStarStatus?: boolean;
+      visibilityStatus?: "private" | "public";
+      projectName?: string;
+    },
+    chatId: string
+  ) => Promise<void>;
+  deleteChat: (chatId: string) => Promise<void>;
+  fetchSingleChat: (chatId: string) => Promise<void>;
+  isStreaming: boolean;
+  
 }

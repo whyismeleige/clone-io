@@ -13,28 +13,41 @@ import { FileItem } from "@/types";
 import { useWebContainer } from "@/hooks/useWebContainer";
 import { cn } from "@/lib/utils";
 import { useChatContext } from "@/context/chat.context";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMounted } from "@/hooks/useMounted";
 
 export default function AppMain() {
   const params = useParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const chatId = params?.id as string;
   const isNewChat = searchParams.get("new") === "true";
 
-  const { tabsState, files, newChat } = useChatContext();
+  const { tabsState, files, newChat, fetchSingleChat } = useChatContext();
   const { webcontainer, error } = useWebContainer();
   const isMounted = useMounted();
 
   useEffect(() => {
     const intializeChat = async () => {
-      if(!isMounted) return;
+      if (!isMounted) return;
 
-      
-    }
+      if (searchParams.has("new")) {
+        const updatedParams = new URLSearchParams(searchParams.toString());
+        updatedParams.delete("new");
 
+        const queryString = updatedParams.toString();
+        router.replace(queryString ? `${pathname}?${queryString}` : pathname, {
+          scroll: false,
+        });
+      }
+
+      if(!isNewChat) {
+        await fetchSingleChat(chatId)
+      }
+    };
     intializeChat();
-  }, []);
+  }, [isMounted]);
 
   useEffect(() => {
     const createMountStructure = (files: FileItem[]): Record<string, any> => {

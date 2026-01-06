@@ -1,4 +1,6 @@
 "use client";
+import DeleteChatDialog from "@/components/shared/Dialogs/DeleteChat";
+import RenameProjectDialog from "@/components/shared/Dialogs/RenameChatTitle";
 import UserDropdown from "@/components/shared/Dropdown/UserDropdown";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -28,6 +30,7 @@ import {
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubItem,
+  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import {
@@ -51,9 +54,12 @@ import {
   PlusCircle,
   Settings,
   UserCircle,
+  Star,
+  Edit2,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 const dummyChatHistory: ChatHistory[] = Array(100)
   .fill(null)
@@ -86,12 +92,18 @@ export default function AppSidebar() {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <Link href="/">
-              <SidebarMenuButton className="cursor-pointer data-[slot=sidebar-menu-button]:!p-1.5">
-                <SiAnthropic />
+            <div className="flex items-center justify-between gap-2">
+              <Link href="/" className="flex gap-2 items-center">
+                
                 <span className="text-base font-semibold">Clone.io</span>
-              </SidebarMenuButton>
-            </Link>
+              </Link>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <SidebarTrigger className="cursor-pointer" />
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Sidebar</TooltipContent>
+              </Tooltip>
+            </div>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
@@ -159,6 +171,54 @@ const NavCreate = () => {
   );
 };
 
+const ChatItemWithDropdown = ({ chat }: { chat: ChatHistory }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const { changeChatDetails } = useChatContext();
+
+  return (
+    <div className="group/item flex items-center w-full gap-1">
+      <Link href={`/chat/${chat._id}`} className="flex-1 min-w-0">
+        <SidebarMenuSubItem className="p-2 text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent rounded-lg cursor-pointer">
+          <span className="truncate">{chat.projectName}</span>
+        </SidebarMenuSubItem>
+      </Link>
+      <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            <EllipsisVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem
+            className="cursor-pointer"
+            onClick={() =>
+              changeChatDetails({ toggleStarStatus: true }, chat._id)
+            }
+          >
+            <Star fill={chat.isStarred ? "yellow" : ""} />
+            {chat.isStarred ? "Unstar" : "Star"}
+          </DropdownMenuItem>
+          <RenameProjectDialog
+            projectName={chat.projectName}
+            chatId={chat._id}
+          />
+          <DropdownMenuSeparator />
+          <DeleteChatDialog chatId={chat._id} projectName={chat.projectName} />
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+};
+
 const NavStarred = ({ chats }: { chats: ChatHistory[] }) => {
   return (
     <SidebarGroup className="py-0">
@@ -176,11 +236,7 @@ const NavStarred = ({ chats }: { chats: ChatHistory[] }) => {
               <CollapsibleContent>
                 <SidebarMenuSub>
                   {chats.map((chat, index) => (
-                    <Link href={`/chat/${chat._id}`} key={index}>
-                      <SidebarMenuSubItem className="p-2 text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent rounded-lg cursor-pointer">
-                        {chat.projectName}
-                      </SidebarMenuSubItem>
-                    </Link>
+                    <ChatItemWithDropdown key={chat._id} chat={chat} />
                   ))}
                 </SidebarMenuSub>
               </CollapsibleContent>
@@ -209,11 +265,7 @@ const NavRecent = ({ chats }: { chats: ChatHistory[] }) => {
               <CollapsibleContent>
                 <SidebarMenuSub>
                   {chats.map((chat, index) => (
-                    <Link href={`/chat/${chat._id}`} key={index}>
-                      <SidebarMenuSubItem className="p-2 text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent rounded-lg cursor-pointer">
-                        {chat.projectName}
-                      </SidebarMenuSubItem>
-                    </Link>
+                    <ChatItemWithDropdown key={chat._id} chat={chat} />
                   ))}
                 </SidebarMenuSub>
               </CollapsibleContent>

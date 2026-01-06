@@ -13,7 +13,7 @@ router.get("/google/callback", controller.googleCallback);
 router.get("/github", controller.githubAuth);
 router.get("/github/callback", controller.githubCallback);
 
-router.post("/exchange-code", controller.exchangeCode);
+router.post("/exchange", controller.exchangeCode);
 
 router.post("/logout", authenticateToken, controller.logout);
 

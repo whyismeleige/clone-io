@@ -65,8 +65,6 @@ export const registerUser = createAsyncThunk(
 
       const data = await response.json();
 
-      console.log("The data is", data);
-
       if (data.type !== "success") {
         return rejectWithValue(data.message);
       }

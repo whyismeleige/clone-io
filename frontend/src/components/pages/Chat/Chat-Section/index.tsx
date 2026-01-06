@@ -11,28 +11,38 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { ArrowUp, CircleCheckBig } from "lucide-react";
 import { useChatContext } from "@/context/chat.context";
+import { useAppSelector } from "@/hooks/redux";
+import { useRef, useEffect } from "react";
 
 export default function ChatSection() {
+  const { user } = useAppSelector((state) => state.auth);
   const { messages, prompt, setPrompt, handleSendPrompt } = useChatContext();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
   return (
     <section className="flex flex-col h-full">
-      <div className="overflow-y-auto flex-1 px-2 custom-scrollbar">
+      <div className="overflow-y-auto flex-1 px-2 w-full custom-scrollbar">
         {messages.map((message, index) =>
           message.role === "user" ? (
             <div
-              className="flex gap-2 justify-self-end w-4/5 mt-2 items-center"
+              className="flex gap-2 justify-self-end flex-row-reverse  w-4/5 mt-2 items-center"
               key={index}
             >
+              <Avatar>
+                <AvatarImage src={user?.avatar} alt={user?.name} />
+                <AvatarFallback>CN</AvatarFallback>
+              </Avatar>
               <span className="rounded-md p-3 border bg-background shadow-xs hover:bg-accent dark:bg-input/30 dark:border-input dark:hover:bg-input/50">
                 {message.content}
               </span>
-              <Avatar>
-                <AvatarImage
-                  src="https://avatars.steamstatic.com/0080c1eebf4fc785c7944995bec1abb8818e2510_full.jpg"
-                  alt="@shadcn"
-                />
-                <AvatarFallback>CN</AvatarFallback>
-              </Avatar>
             </div>
           ) : (
             <div key={index}>
@@ -73,8 +83,13 @@ export default function ChatSection() {
             </div>
           )
         )}
+        <div ref={messagesEndRef} />
       </div>
-      <InputBox prompt={prompt} setPrompt={setPrompt} sendPrompt={handleSendPrompt} />
+      <InputBox
+        prompt={prompt}
+        setPrompt={setPrompt}
+        sendPrompt={handleSendPrompt}
+      />
     </section>
   );
 }
@@ -82,7 +97,7 @@ export default function ChatSection() {
 function InputBox({
   prompt,
   setPrompt,
-  sendPrompt
+  sendPrompt,
 }: {
   prompt: string;
   setPrompt: (value: string) => void;

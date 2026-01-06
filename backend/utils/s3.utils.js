@@ -5,6 +5,22 @@ const s3Client = require("../config/s3.config");
 const BUCKET_NAME = process.env.S3_BUCKET_NAME;
 const AWS_REGION = process.env.AWS_REGION;
 
+async function getS3TextFile(key) {
+  const command = new GetObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+  });
+
+  const data = await s3Client.send(command);
+
+  const contentType = data.ContentType || "";
+  const isBinary = isBinaryFile(contentType, key);
+
+  if (isBinary) return null;
+
+  return data.Body.transformToString("utf-8");
+}
+
 async function uploadS3File(key, file, metadata) {
   const command = new PutObjectCommand({
     Bucket: BUCKET_NAME,
@@ -73,4 +89,52 @@ function getContentType(filename) {
   return contentTypes[ext] || "application/octet-stream";
 }
 
-module.exports = { uploadS3File };
+function isBinaryFile(contentType, filename) {
+  // Common binary content types
+  const binaryTypes = [
+    "image/",
+    "video/",
+    "audio/",
+    "application/pdf",
+    "application/zip",
+    "application/x-rar",
+    "application/octet-stream",
+  ];
+
+  if (binaryTypes.some((type) => contentType.startsWith(type))) {
+    return true;
+  }
+
+  // Check by file extension
+  const binaryExtensions = [
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".bmp",
+    ".ico",
+    ".svg",
+    ".mp4",
+    ".avi",
+    ".mov",
+    ".mp3",
+    ".wav",
+    ".pdf",
+    ".zip",
+    ".rar",
+    ".tar",
+    ".gz",
+    ".exe",
+    ".dll",
+    ".so",
+    ".dylib",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+  ];
+
+  return binaryExtensions.some((ext) => filename.toLowerCase().endsWith(ext));
+}
+
+module.exports = { uploadS3File, getS3TextFile };

@@ -13,10 +13,11 @@ import {
   Sun,
   UserCircle,
   X,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/ui/mode-toggle";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import {
   Tooltip,
   TooltipContent,
@@ -39,15 +40,27 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import UserDropdown from "@/components/shared/Dropdown/UserDropdown";
 
 export const HeroHeader = () => {
+  const { open } = useSidebar();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
 
   const [menuState, setMenuState] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [showBanner, setShowBanner] = useState(true);
 
   useEffect(() => {
     setIsMounted(true);
+    // Check if banner was previously closed
+    const bannerClosed = localStorage.getItem('apiNoticeClosed');
+    if (bannerClosed === 'true') {
+      setShowBanner(false);
+    }
   }, []);
+
+  const handleCloseBanner = () => {
+    setShowBanner(false);
+    localStorage.setItem('apiNoticeClosed', 'true');
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -59,9 +72,36 @@ export const HeroHeader = () => {
 
   return (
     <header>
+      {/* Notice Banner */}
+      {showBanner && (
+        <div className="fixed top-0 z-30 w-full bg-primary/90 backdrop-blur-sm border-b border-primary">
+          <div className="mx-auto max-w-6xl px-4 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center justify-center gap-2 text-sm text-primary-foreground flex-1">
+                <Info className="size-4 flex-shrink-0" />
+                <p className="text-center">
+                  <span className="font-semibold">Announcement :</span> My API tokens have been depleted for now. 
+                  Users cannot create new chats for now, but you can view previous public projects.
+                </p>
+              </div>
+              <button
+                onClick={handleCloseBanner}
+                aria-label="Close notice"
+                className="flex-shrink-0 cursor-pointer rounded-md p-1 text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <nav
         data-state={menuState && "active"}
-        className="fixed z-20 w-full px-2"
+        className={cn(
+          "fixed z-20 w-full px-2 transition-all duration-300",
+          showBanner ? "pt-12" : "pt-0"
+        )}
       >
         <div
           className={cn(
@@ -80,12 +120,14 @@ export const HeroHeader = () => {
                 >
                   Clone.io
                 </Link>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <SidebarTrigger className="cursor-pointer" />
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">Sidebar</TooltipContent>
-                </Tooltip>
+                {!open && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <SidebarTrigger className="cursor-pointer ml-auto" />
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Sidebar</TooltipContent>
+                  </Tooltip>
+                )}
               </div>
 
               <button

@@ -13,6 +13,7 @@ import { DropdownMenuContentProps } from "@radix-ui/react-dropdown-menu";
 import { Bell, CreditCard, LogOut, Settings, UserCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { RefAttributes, useState } from "react";
+import SettingsDialog from "../Dialogs/SettingsDialog";
 
 export default function UserDropdown(
   props: DropdownMenuContentProps & RefAttributes<HTMLDivElement>
@@ -57,10 +58,12 @@ export default function UserDropdown(
           <UserCircle />
           My Projects
         </DropdownMenuItem>
-        <DropdownMenuItem className="cursor-pointer">
-          <Settings />
-          Account Settings
-        </DropdownMenuItem>
+        <SettingsDialog>
+          <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer">
+            <Settings />
+            Account Settings
+          </DropdownMenuItem>
+        </SettingsDialog>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
       <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">

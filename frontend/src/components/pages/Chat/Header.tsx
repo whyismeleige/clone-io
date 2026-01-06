@@ -49,6 +49,8 @@ import {
   Moon,
   Sun,
   Monitor,
+  Lock,
+  Star,
 } from "lucide-react";
 import { useState } from "react";
 import { FileItem } from "@/types";
@@ -60,6 +62,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import UserDropdown from "@/components/shared/Dropdown/UserDropdown";
+import RenameProjectDialog from "@/components/shared/Dialogs/RenameChatTitle";
+import DeleteChatDialog from "@/components/shared/Dialogs/DeleteChat";
 
 const zipFoldersRecursive = (files?: FileItem[], folder?: JSZip | null) => {
   files?.forEach((item) => {
@@ -77,7 +81,8 @@ export default function AppHeader() {
   const [status, setStatus] = useState("");
 
   const { user } = useAppSelector((state) => state.auth);
-  const { files, toggleTabsState, currentChat } = useChatContext();
+  const { files, toggleTabsState, currentChat, changeChatDetails } =
+    useChatContext();
 
   const downloadZipFiles = async () => {
     try {
@@ -128,27 +133,65 @@ export default function AppHeader() {
               className="cursor-pointer"
             >
               {currentChat?.projectName}
-              <LockIcon />
+              {currentChat?.visibilityStatus === "private" ? (
+                <Lock />
+              ) : (
+                <Globe />
+              )}
               <ChevronDown />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-40">
-            <DropdownMenuGroup>
-              <DropdownMenuItem className="cursor-pointer">
-                <History />
-                Version History
-              </DropdownMenuItem>
-              <RenameProject title="Sample Project Title" />
-              <DropdownMenuItem className="cursor-pointer">
-                <Copy />
-                Duplicate
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer">
-                <Blend />
-                Blend
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
+          {currentChat && (
+            <DropdownMenuContent className="w-40">
+              <DropdownMenuGroup>
+                <RenameProjectDialog
+                  projectName={currentChat.projectName}
+                  chatId={currentChat._id}
+                />
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={() =>
+                    changeChatDetails(
+                      { toggleStarStatus: true },
+                      currentChat._id
+                    )
+                  }
+                >
+                  <Star fill={currentChat?.isStarred ? "yellow" : ""} />
+                  {currentChat?.isStarred ? "Unstar" : "Star"}
+                </DropdownMenuItem>
+                {(() => {
+                  const visibilityStatus =
+                    currentChat?.visibilityStatus === "private"
+                      ? "public"
+                      : "private";
+
+                  return (
+                    <DropdownMenuItem
+                      onClick={() =>
+                        changeChatDetails({ visibilityStatus }, currentChat._id)
+                      }
+                      className="cursor-pointer"
+                    >
+                      {visibilityStatus === "public" ? (
+                        <>
+                          <Globe />
+                          Make Public
+                        </>
+                      ) : (
+                        <>
+                          <Lock />
+                          Make Private
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                  );
+                })()}
+                <DropdownMenuSeparator/>
+                <DeleteChatDialog chatId={currentChat._id} projectName={currentChat.projectName} />
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          )}
         </DropdownMenu>
         <div className="w-1/2 mx-auto flex justify-center">
           <Tabs defaultValue="code">
@@ -194,7 +237,7 @@ export default function AppHeader() {
             <TooltipContent>Download your Project</TooltipContent>
           </Tooltip>
           {/* <GithubDialog /> */}
-          <Tooltip>
+          {/* <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="outline"
@@ -206,7 +249,7 @@ export default function AppHeader() {
               </Button>
             </TooltipTrigger>
             <TooltipContent>Deploy your Website</TooltipContent>
-          </Tooltip>
+          </Tooltip> */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Avatar className="cursor-pointer">
@@ -214,7 +257,7 @@ export default function AppHeader() {
                 <AvatarFallback>CN</AvatarFallback>
               </Avatar>
             </DropdownMenuTrigger>
-            <UserDropdown className="w-60"/>
+            <UserDropdown className="w-60" />
           </DropdownMenu>
         </div>
       </div>
@@ -256,49 +299,3 @@ export default function AppHeader() {
 //     </Dialog>
 //   );
 // };
-
-const RenameProject = ({ title }: { title: string }) => {
-  const [input, setInput] = useState(title);
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <DropdownMenuItem
-          onSelect={(e) => e.preventDefault()}
-          className="cursor-pointer"
-        >
-          <Pen />
-          Rename
-        </DropdownMenuItem>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Rename Project Title</DialogTitle>
-          <DialogDescription>
-            Make changes to your Project Title here. Click save when you&apos;re
-            done.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-3">
-          <Label htmlFor="title">Project Title</Label>
-          <Input
-            id="title"
-            name="title"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            autoFocus
-          />
-        </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline" className="cursor-pointer">
-              Cancel
-            </Button>
-          </DialogClose>
-          <DialogClose asChild>
-            <Button className="cursor-pointer">Save Changes</Button>
-          </DialogClose>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};

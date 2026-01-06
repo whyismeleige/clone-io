@@ -2,23 +2,98 @@
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
-import { WebContainer } from "@webcontainer/api";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { WebContainer, reloadPreview } from "@webcontainer/api";
 import {
   ExternalLink,
   Fullscreen,
   MonitorSmartphone,
   RefreshCcw,
+  Minimize,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface PreviewFrameProps {
   webContainer: WebContainer | null;
   error?: Error | null;
 }
 
-export default function PreviewFrame({ webContainer, error }: PreviewFrameProps) {
+type DeviceType = "desktop" | "tablet" | "mobile";
+
+const DEVICE_SIZES = {
+  desktop: { width: "100%", height: "100%" },
+  tablet: { width: "768px", height: "100%" },
+  mobile: { width: "375px", height: "667px" },
+};
+
+export default function PreviewFrame({
+  webContainer,
+  error,
+}: PreviewFrameProps) {
   const [url, setUrl] = useState("");
+  const [port, setPort] = useState<number | null>(null);
   const [status, setStatus] = useState("Initializing...");
+  const [device, setDevice] = useState<DeviceType>("desktop");
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const previewIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const handleRefresh = async () => {
+    if (previewIframeRef.current) {
+      await reloadPreview(previewIframeRef.current);
+    }
+  };
+
+  const handleOpenInNewTab = () => {
+    if (url) {
+      window.open(url, "_blank");
+    }
+  };
+
+  const handleDeviceChange = (newDevice: DeviceType) => {
+    setDevice(newDevice);
+  };
+
+  const toggleFullscreen = async () => {
+    if (!containerRef.current) return;
+
+    if (!isFullscreen) {
+      try {
+        await containerRef.current.requestFullscreen();
+        setIsFullscreen(true);
+      } catch (err) {
+        console.error("Failed to enter fullscreen:", err);
+      }
+    } else {
+      try {
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+      } catch (err) {
+        console.error("Failed to exit fullscreen:", err);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (!webContainer) return;
@@ -47,8 +122,6 @@ export default function PreviewFrame({ webContainer, error }: PreviewFrameProps)
         setStatus("Starting dev server...");
         const devProcess = await webContainer?.spawn("npm", ["run", "dev"]);
 
-        
-
         devProcess?.output.pipeTo(
           new WritableStream({
             write(data) {
@@ -58,10 +131,11 @@ export default function PreviewFrame({ webContainer, error }: PreviewFrameProps)
         );
 
         // Listen for server-ready event
-        webContainer?.on("server-ready", (port, serverUrl) => {
+        webContainer?.on("server-ready", (portNum, serverUrl) => {
           if (isMounted) {
-            console.log(`Server ready on port ${port}: ${serverUrl}`);
+            console.log(`Server ready on port ${portNum}: ${serverUrl}`);
             setUrl(serverUrl);
+            setPort(portNum);
             setStatus("Ready");
           }
         });
@@ -106,25 +180,113 @@ export default function PreviewFrame({ webContainer, error }: PreviewFrameProps)
   }
 
   return (
-    <>
+    <div ref={containerRef} className="h-full flex flex-col">
       <div className="flex p-3 gap-10 justify-between border-b">
-        <Input type="text" placeholder="/" />
+        <div className="flex items-center gap-2 flex-1">
+          <Input type="text" placeholder="/" className="flex-1" readOnly/>
+          {port && (
+            <span className="text-sm text-gray-500 whitespace-nowrap">
+              Port: {port}
+            </span>
+          )}
+        </div>
         <ButtonGroup>
-          <Button size="icon" className="cursor-pointer" variant="outline">
-            <RefreshCcw />
-          </Button>
-          <Button size="icon" className="cursor-pointer" variant="outline">
-            <ExternalLink />
-          </Button>
-          <Button size="icon" className="cursor-pointer" variant="outline">
-            <MonitorSmartphone />
-          </Button>
-          <Button size="icon" className="cursor-pointer" variant="outline">
-            <Fullscreen />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                onClick={handleRefresh}
+                className="cursor-pointer"
+                variant="outline"
+              >
+                <RefreshCcw />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Refresh</TooltipContent>
+          </Tooltip>
+          {/* <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                onClick={handleOpenInNewTab}
+                className="cursor-pointer"
+                variant="outline"
+              >
+                <ExternalLink />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Open in New Tab</TooltipContent>
+          </Tooltip> */}
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="icon"
+                    className="cursor-pointer"
+                    variant="outline"
+                  >
+                    <MonitorSmartphone />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Change Device</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent>
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => handleDeviceChange("desktop")}
+              >
+                Desktop
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => handleDeviceChange("tablet")}
+              >
+                Tablet
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => handleDeviceChange("mobile")}
+              >
+                Mobile
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                onClick={toggleFullscreen}
+                className="cursor-pointer"
+                variant="outline"
+              >
+                {isFullscreen ? <Minimize /> : <Fullscreen />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+            </TooltipContent>
+          </Tooltip>
         </ButtonGroup>
       </div>
-      <iframe className="w-full h-full border-0" src={url} title="Preview" />
-    </>
+      <div className="flex-1 overflow-auto flex items-center justify-center bg-gray-100">
+        <div
+          style={{
+            width: DEVICE_SIZES[device].width,
+            height: DEVICE_SIZES[device].height,
+            transition: "all 0.3s ease",
+          }}
+          
+        >
+          <iframe
+            ref={previewIframeRef}
+            className="w-full h-full border-0"
+            src={url}
+            title="Preview"
+          />
+        </div>
+      </div>
+    </div>
   );
 }

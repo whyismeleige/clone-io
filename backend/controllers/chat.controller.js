@@ -5,9 +5,13 @@ const { reactJSBasePrompt } = require("../utils/prompts/defaults/react");
 const { nodeJSBasePrompt } = require("../utils/prompts/defaults/node");
 const asyncHandler = require("../middleware/asyncHandler");
 const db = require("../models");
-const { ValidationError, ExternalAPIError } = require("../utils/errors.utils");
+const {
+  ValidationError,
+  ExternalAPIError,
+  NotFoundError,
+} = require("../utils/errors.utils");
 const { dummyPromptData } = require("../utils/dummyData");
-const { uploadS3File } = require("../utils/s3.utils");
+const { uploadS3File, getS3TextFile } = require("../utils/s3.utils");
 const anthropic = new Anthropic();
 
 const User = db.user;
@@ -29,8 +33,34 @@ const handleClaudeErrors = (error) => {
   throw new ExternalAPIError("Failed to process prompt with Claude API", error);
 };
 
+exports.modifyChat = asyncHandler(async (req, res) => {
+  const chatId = req.query.id;
+
+  const { data } = req.body;
+
+  if (!chatId || !data) {
+    throw new ValidationError("Chat and Data required for modification");
+  }
+
+  const chat = await Chat.findById(chatId);
+
+  if (!chat) {
+    throw new ValidationError("Chat does not exist");
+  }
+
+  await chat.modifyChat(data);
+
+  res.status(200).send({
+    message: "Successfully modified chat",
+    type: "success",
+  });
+});
+
 exports.getChats = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id).populate("chats");
+  const user = await User.findById(req.user._id).populate({
+    path: "chats",
+    match: { isDeleted: false }, // Explicitly filter out deleted chats in populate
+  });
 
   const chats = user.chats.map((chat) => ({
     _id: chat._id,
@@ -43,6 +73,32 @@ exports.getChats = asyncHandler(async (req, res) => {
     message: "Chats retrieved successfully",
     type: "success",
     chats,
+  });
+});
+
+exports.deleteChat = asyncHandler(async (req, res) => {
+  const chatId = req.query.id;
+  const userId = req.user._id;
+
+  const chat = await Chat.findOne({ _id: chatId, createdBy: userId });
+
+  if (!chat) {
+    throw new NotFoundError(
+      "Chat not found or you don't have permission to delete it"
+    );
+  }
+
+  // Check if already deleted
+  if (chat.isDeleted) {
+    throw new ValidationError("Chat is already deleted");
+  }
+
+  await chat.softDelete(userId);
+
+  res.status(200).send({
+    message: "Chat deleted successfully",
+    type: "success",
+    chatId: chat._id,
   });
 });
 
@@ -72,10 +128,14 @@ exports.sendPrompt = asyncHandler(async (req, res) => {
 
   const chat = await Chat.findById(chatId);
 
-  await chat.saveConversation("user", messages[messages.length - 1].content);
-
   if (!chat) {
     throw new ValidationError("Chat not found");
+  }
+
+  await chat.saveConversation("user", messages[messages.length - 1].content);
+
+  if (chat.conversations.length === 1) {
+    await chat.saveConversation("assistant", reactJSBasePrompt);
   }
 
   try {
@@ -83,7 +143,7 @@ exports.sendPrompt = asyncHandler(async (req, res) => {
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
 
-    const MAX_TOKENS = process.env.NODE_ENV === "production" ? 16000 : 200;
+    const MAX_TOKENS = process.env.NODE_ENV !== "production" ? 16000 : 200;
 
     if (process.env.NODE_ENV !== "production") {
       // Dummy response data
@@ -129,18 +189,15 @@ exports.sendPrompt = asyncHandler(async (req, res) => {
         })}\n\n`
       );
 
-      console.log(
-        `Tokens used (dummy): ${dummyResponse.usage.output_tokens}/${MAX_TOKENS}`
-      );
-
       res.end();
       return;
     }
 
     const stream = await anthropic.messages.stream({
       messages,
-      model: "claude-3-5-haiku-latest",
+      model: "claude-sonnet-4-5-20250929",
       max_tokens: MAX_TOKENS,
+      system: getSystemPrompt(),
     });
 
     let fullText = "";
@@ -149,8 +206,8 @@ exports.sendPrompt = asyncHandler(async (req, res) => {
       res.write(
         `data: ${JSON.stringify({
           type: "message_start",
-          message,
-        })}`
+          message: message,
+        })}\n\n`
       );
     });
 
@@ -179,13 +236,7 @@ exports.sendPrompt = asyncHandler(async (req, res) => {
         `data: ${JSON.stringify({
           type: "done",
           message: finalMessage,
-          fullText,
-          truncated: finalMessage.stop_reason === "max_tokens",
         })}\n\n`
-      );
-
-      console.log(
-        `Tokens used: ${finalMessage.usage.output_tokens}/${MAX_TOKENS}`
       );
 
       res.end();
@@ -303,10 +354,17 @@ exports.fetchChat = asyncHandler(async (req, res) => {
     throw new ValidationError("Chat does not exist");
   }
 
+  const files = await fetchAndTransformProjectFiles(
+    chat.projectFiles,
+    req.user._id,
+    chatId
+  );
+
   res.status(200).send({
     message: "Chat retrieved successfully",
     type: "success",
     chat,
+    files,
   });
 });
 
@@ -340,6 +398,184 @@ exports.uploadProjectToS3 = asyncHandler(async (req, res) => {
   res.status(200).send({
     message: "Project Files saved successfully",
     type: "success",
-    projectFiles
+    projectFiles,
   });
 });
+
+exports.getPublicProjects = asyncHandler(async (req, res) => {
+  const { limit = 6 } = req.query;
+
+  const publicProjects = await Chat.aggregate([
+    {
+      $match: {
+        visibilityStatus: "public",
+        isDeleted: false,
+        status: "active",
+      },
+    },
+    {
+      $sort: { views: -1 },
+    },
+    {
+      $limit: parseInt(limit),
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "createdBy",
+        foreignField: "_id",
+        as: "creator",
+      },
+    },
+    {
+      $project: {
+        projectName: 1,
+        snapshot: 1,
+        model: 1,
+        views: 1,
+        createdBy: 1,
+        deployedAt: 1,
+        lastActivity: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    },
+  ]);
+
+  res.status(200).send({
+    message: "Public projects received",
+    type: "success",
+    projects: publicProjects,
+  });
+});
+
+exports.incrementViewCount = asyncHandler(async (req, res) => {
+  const { projectId } = req.params;
+
+  // Increment view count
+  const result = await Chat.updateOne(
+    {
+      _id: projectId,
+      isDeleted: false,
+      visibilityStatus: "public",
+      status: "active",
+    },
+    { $inc: { views: 1 } }
+  );
+
+  // Check if project was found and updated
+  if (result.matchedCount === 0) {
+    return res.status(404).send({
+      message: "Project not found",
+      type: "error",
+    });
+  }
+
+  res.status(200).send({
+    message: "View count incremented",
+    type: "success",
+  });
+});
+
+async function fetchAndTransformProjectFiles(projectFiles, userId, chatId) {
+  if (!projectFiles || projectFiles.length === 0) {
+    return [];
+  }
+
+  // Define the prefix to remove
+  const prefixToRemove = `users/${userId}/chats/${chatId}/`;
+
+  // Fetch all file contents from S3 in parallel
+  const filesWithContent = await Promise.all(
+    projectFiles.map(async ({ key }) => {
+      try {
+        const content = await getS3TextFile(key);
+        // Remove the prefix from the key for structure building
+        const trimmedKey = key.startsWith(prefixToRemove)
+          ? key.slice(prefixToRemove.length)
+          : key;
+        return { key, trimmedKey, content };
+      } catch (error) {
+        console.error(`Error fetching content for ${key}:`, error);
+        const trimmedKey = key.startsWith(prefixToRemove)
+          ? key.slice(prefixToRemove.length)
+          : key;
+        return { key, trimmedKey, content: null, error: error.message };
+      }
+    })
+  );
+
+  // Build hierarchical structure using trimmed keys
+  const root = {};
+
+  filesWithContent.forEach(({ key, trimmedKey, content, error }) => {
+    const parts = trimmedKey.split("/");
+    let current = root;
+
+    parts.forEach((part, index) => {
+      if (index === parts.length - 1) {
+        // It's a file
+        if (!current[part]) {
+          current[part] = {
+            name: part,
+            type: "file",
+            path: trimmedKey, // Use trimmed path
+            s3Key: key, // Keep original key for S3 operations if needed
+            content: content,
+          };
+
+          // Optionally include error info if fetch failed
+          if (error) {
+            current[part].error = error;
+          }
+        }
+      } else {
+        // It's a folder
+        if (!current[part]) {
+          current[part] = {
+            name: part,
+            type: "folder",
+            path: parts.slice(0, index + 1).join("/"),
+            children: {},
+          };
+        }
+        current = current[part].children;
+      }
+    });
+  });
+
+  // Convert nested object structure to array format
+  function convertToArray(obj) {
+    return Object.values(obj).map((item) => {
+      if (item.type === "folder" && item.children) {
+        return {
+          name: item.name,
+          type: item.type,
+          path: item.path,
+          children: convertToArray(item.children),
+        };
+      }
+
+      const fileItem = {
+        name: item.name,
+        type: item.type,
+        path: item.path,
+        content: item.content,
+      };
+
+      // Optionally include s3Key for reference
+      if (item.s3Key) {
+        fileItem.s3Key = item.s3Key;
+      }
+
+      // Optionally include error if present
+      if (item.error) {
+        fileItem.error = item.error;
+      }
+
+      return fileItem;
+    });
+  }
+
+  return convertToArray(root);
+}

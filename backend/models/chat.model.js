@@ -26,6 +26,10 @@ const ChatSchema = new mongoose.Schema(
         },
       },
     ],
+    snapshot: {
+      type: String,
+      trim: true,
+    },
     model: {
       type: String,
       trim: true,
@@ -73,6 +77,10 @@ const ChatSchema = new mongoose.Schema(
         message: "Invalid deployment URL",
       },
     },
+    views: {
+      type: Number,
+      default: 0,
+    },
     visibilityStatus: {
       type: String,
       enum: ["public", "private"],
@@ -103,6 +111,20 @@ const ChatSchema = new mongoose.Schema(
       enum: ["active", "archived", "deleted"],
       default: "active",
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -112,6 +134,13 @@ const ChatSchema = new mongoose.Schema(
 ChatSchema.index({ createdBy: 1, createdAt: -1 });
 ChatSchema.index({ projectName: "text" });
 
+ChatSchema.methods.modifyChat = async function (data) {
+  if (data.toggleStarStatus) this.isStarred = !this.isStarred;
+  this.visibilityStatus = data?.visibilityStatus || this.visibilityStatus;
+  this.projectName = data?.projectName || this.projectName;
+  return await this.save();
+};
+
 ChatSchema.methods.saveConversation = async function (role, content) {
   this.conversations.push({ role, content });
   await this.save();
@@ -119,6 +148,14 @@ ChatSchema.methods.saveConversation = async function (role, content) {
 
 ChatSchema.methods.saveProjectFiles = async function (files) {
   this.projectFiles = files;
+  return await this.save();
+};
+
+ChatSchema.methods.softDelete = async function (userId) {
+  this.isDeleted = true;
+  this.deletedAt = new Date();
+  this.deletedBy = userId;
+  this.status = "deleted";
   return await this.save();
 };
 

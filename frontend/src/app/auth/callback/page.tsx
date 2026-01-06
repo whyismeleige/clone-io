@@ -11,7 +11,7 @@ export default function AuthCallback() {
   const dispatch = useAppDispatch();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const { prompt, newChat } = useChatContext();
+  const { newChat, setPrompt } = useChatContext();
 
   useEffect(() => {
     const code = searchParams.get("code");
@@ -27,8 +27,12 @@ export default function AuthCallback() {
         await dispatch(exchangeOAuthCode(code)).unwrap();
 
         const newAccessToken = TokenService.getAccessToken();
-        if (prompt && prompt.trim() !== "") {
-          await newChat(newAccessToken);
+
+        const savedPrompt = localStorage.getItem("chatPrompt");
+
+        if (savedPrompt && savedPrompt.trim() !== "") {
+          if(setPrompt) setPrompt(savedPrompt);
+          await newChat(newAccessToken, savedPrompt);
         } else {
           setTimeout(() => router.replace("/"), 2000);
         }

@@ -159,9 +159,9 @@ export default function Auth() {
             </Button>
           </Field>
           <FieldSeparator>Or</FieldSeparator>
-          <Field className="grid gap-4 sm:grid-cols-2">
+          <Field className="grid gap-4 sm:grid-cols-1">
             <GithubLoginButton />
-            <GoogleLoginButton />
+            
           </Field>
         </FieldGroup>
       </form>

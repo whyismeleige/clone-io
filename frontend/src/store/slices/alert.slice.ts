@@ -39,7 +39,6 @@ const alertSlice = createSlice({
 export const { addAlert, removeAlert, clearAllAlerts } = alertSlice.actions;
 
 export const showSuccess = (message: string, options: AlertOptions = {}) => {
-  console.log(message);
   return (dispatch: any) => {
     const id = Date.now() + Math.random();
     const alert = {

@@ -12,11 +12,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FileIcon } from "lucide-react";
 import Editor from "@monaco-editor/react";
-import { useAppDispatch } from "@/hooks/redux";
 import { Fragment } from "react";
 import { useTheme } from "next-themes";
 import { Tree } from "./FileStructure";
 import { useChatContext } from "@/context/chat.context";
+import { FileItem } from "@/types";
 
 export default function CodeEditor() {
   const { currentFile } = useChatContext();
@@ -26,7 +26,7 @@ export default function CodeEditor() {
   return (
     <section className="h-full flex flex-col">
       <div className="border-b p-2 ">
-        <FilesBreadcrumb path={filePath} />
+        <FilesBreadcrumb path={filePath} currentPath={currentFile?.path} />
       </div>
       <div className="flex-1">
         <Editor
@@ -44,20 +44,38 @@ export default function CodeEditor() {
   );
 }
 
-function FilesBreadcrumb({ path }: { path?: string[] }) {
- const { files } = useChatContext();
-  const dispatch = useAppDispatch();
+function FilesBreadcrumb({ path, currentPath }: { path?: string[]; currentPath?: string }) {
+  const { files, changeCurrentFile } = useChatContext();
+  
+  // Get children at specific depth level
+  const getChildrenAtLevel = (items: FileItem[], targetPath: string[]): FileItem[] => {
+    if (targetPath.length === 0) return items;
+    
+    const [current, ...rest] = targetPath;
+    const foundItem = items.find(item => item.name === current);
+    
+    if (!foundItem || !foundItem.children || rest.length === 0) {
+      return foundItem?.children || [];
+    }
+    
+    return getChildrenAtLevel(foundItem.children, rest);
+  };
   
   return (
     <Breadcrumb className="flex items-center ml-2 h-7">
       <BreadcrumbList className="text-md align-middle">
         {path?.map((item, index) => {
+          // Build path up to current breadcrumb level
+          const pathUpToHere = path.slice(0, index);
+          const childrenAtLevel = getChildrenAtLevel(files, pathUpToHere);
+          const isLastItem = path.length - 1 === index;
+          
           return (
             <Fragment key={index}>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <BreadcrumbItem className="cursor-pointer">
-                    {path.length - 1 !== index ? (
+                    {!isLastItem ? (
                       item
                     ) : (
                       <BreadcrumbPage className="flex items-center">
@@ -68,10 +86,10 @@ function FilesBreadcrumb({ path }: { path?: string[] }) {
                   </BreadcrumbItem>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  {Tree(files, dispatch)}
+                  {Tree(childrenAtLevel, changeCurrentFile)}
                 </DropdownMenuContent>
               </DropdownMenu>
-              {path.length - 1 !== index && <BreadcrumbSeparator />}
+              {!isLastItem && <BreadcrumbSeparator />}
             </Fragment>
           );
         })}
@@ -79,7 +97,6 @@ function FilesBreadcrumb({ path }: { path?: string[] }) {
     </Breadcrumb>
   );
 }
-
 const getLanguagesFromFilename = (filename: string): string => {
   const extension = filename.split(".").pop()?.toLowerCase();
 

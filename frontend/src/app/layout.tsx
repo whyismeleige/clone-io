@@ -7,6 +7,7 @@ import AppSidebar from "@/components/pages/Chat/Sidebar";
 export const metadata: Metadata = {
   title: "Clone.io",
   description: "Make Websites on the go",
+  icons: "clone-io-favicon.svg"
 };
 
 export default function RootLayout({

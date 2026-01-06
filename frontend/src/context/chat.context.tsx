@@ -5,6 +5,7 @@ import { FileItem, Step, StepType } from "@/types";
 import {
   Chat,
   ChatContextType,
+  ChatConversation,
   ChatHistory,
   ChatMessage,
   PromptMessage,
@@ -40,6 +41,28 @@ const sortFilesAndFoldersRecursive = (nodes: FileItem[]): FileItem[] => {
     }
     return node;
   });
+};
+
+const convertConversationsToChatMessages = (
+  conversations: ChatConversation[]
+): ChatMessage[] => {
+  const messages: ChatMessage[] = conversations.map((conversation) => {
+    return conversation.role === "assistant"
+      ? {
+          role: "assistant",
+          content: parseXml(conversation.content).map((step) => ({
+            ...step,
+            status: "completed",
+          })),
+          timestamp: conversation.timestamp,
+        }
+      : {
+          role: "user",
+          content: conversation.content,
+          timestamp: conversation.timestamp,
+        };
+  });
+  return messages;
 };
 
 const getInitialFile = (nodes: FileItem[]): FileItem => {
@@ -86,34 +109,46 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     }
   }, [prompt, isMounted]);
 
+  const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [currentChat, setCurrentChat] = useState<Chat | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
   const [tabsState, toggleTabsState] = useState<TabsState>("code");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [currentFile, changeCurrentFile] = useState<FileItem | null>(null);
+  const [allStepsProcessed, setAllStepsProcessed] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
 
-  // Get the latest assistant message
-  const getLatestAssistantMessage = (): ChatMessage | null => {
+  const filesRef = useRef<FileItem[]>(files);
+  const currentChatRef = useRef<Chat | null>(currentChat);
+  const accessTokenRef = useRef<string | null>(accessToken);
+
+  useEffect(() => {
+    filesRef.current = files;
+  }, [files]);
+
+  useEffect(() => {
+    currentChatRef.current = currentChat;
+  }, [currentChat]);
+
+  useEffect(() => {
+    accessTokenRef.current = accessToken;
+  }, [accessToken]);
+
+  const getLatestStepsFromMessages = useCallback((): Step[] => {
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === "assistant") {
-        return messages[i];
+        return messages[i].content as Step[];
       }
     }
-    return null;
-  };
+    return [];
+  }, [messages]);
 
-  // Get steps from the latest assistant message
-  const getLatestSteps = (): Step[] => {
-    const latestAssistant = getLatestAssistantMessage();
-    return latestAssistant?.role === "assistant" ? latestAssistant.content : [];
-  };
-
-  const saveFiles = async (files: FileItem[]) => {
+  const saveFiles = useCallback((files: FileItem[]) => {
     const sortedFiles = sortFilesAndFoldersRecursive(files);
     changeCurrentFile(getInitialFile(files));
     setFiles(sortedFiles);
-  };
+  }, []);
 
   const addStepstoLatestMessage = (newSteps: Step[]) => {
     setMessages((prev) => {
@@ -158,33 +193,34 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
   // Upload files to S3
   const uploadToS3 = useCallback(
     async (newAccessToken?: string | null) => {
-      const authToken = accessToken || newAccessToken;
+      const authToken = accessTokenRef.current || newAccessToken;
+      const currentFilesData = filesRef.current;
+      const currentChatData = currentChatRef.current;
 
-      console.log("The files are", files);
-      console.log("The current chat are", currentChat);
-
-      if (!currentChat || !authToken || files.length === 0) {
-        console.log("Cannot upload: missing chat, token, or files");
+      if (!currentChatData || !authToken || currentFilesData.length === 0) {
         return;
       }
 
-      const flattenedFiles = flattenFileStructure(files);
+      const flattenedFiles = flattenFileStructure(currentFilesData);
 
-      console.log("The flattened files are", flattenedFiles);
-      // try {
-      //   const response = await fetch(
-      //     `${BACKEND_URL}/api/chat/upload-project-files?id=${currentChat._id}`,
-      //     {
-      //       method: "POST",
-      //       headers: {
-      //         Authorization: `Bearer ${authToken}`,
-      //         "Content-Type": `application/json`,
-      //       },
-      //     }
-      //   );
-      // } catch (error) {}
+      try {
+        const response = await fetch(
+          `${BACKEND_URL}/api/chat/upload-project-files?id=${currentChatData._id}`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ files: flattenedFiles }),
+          }
+        );
+        const data = await response.json();
+      } catch (error) {
+        console.error("Upload error:", error);
+      }
     },
-    [files, currentChat, accessToken]
+    [] // No dependencies needed since we use refs
   );
 
   // Fetch Chats List
@@ -210,27 +246,44 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
   // Fetch Single Chat by Id
   const fetchSingleChat = async (chatId: string) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/chat/${chatId}`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+      const response = await fetch(
+        `${BACKEND_URL}/api/chat/history?id=${chatId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
       const data = await response.json();
+
+      if (data.type !== "success") throw new Error(data.message);
+
+      setCurrentChat(data.chat);
+      setConversations(data.chat.conversations);
+      setMessages(convertConversationsToChatMessages(data.chat.conversations));
+      saveFiles(data.files);
     } catch (error) {
       console.error("Error in fetching chat", error);
+      router.replace("/");
     }
   };
 
   // Start of the New Chat
-  const newChat = async (newAccessToken?: string | null) => {
+  const newChat = async (
+    newAccessToken?: string | null,
+    newPrompt?: string
+  ) => {
     try {
-      if (!newAccessToken && !accessToken) return;
+      const savedPrompt = prompt || newPrompt || "";
+
+      if ((!newAccessToken && !accessToken) || !savedPrompt) return;
+      setIsStreaming(true);
       // Add the User Message
       setMessages((prev) => [
         ...prev,
         {
           role: "user",
-          content: prompt,
+          content: savedPrompt,
           timestamp: new Date().toISOString(),
         },
       ]);
@@ -242,7 +295,7 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
           Authorization: `Bearer ${accessToken || newAccessToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt: savedPrompt }),
       });
 
       const data = await response.json();
@@ -260,18 +313,41 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       }));
 
       // Convert the base prompts into Prompt messages understandable ot Claude or any AI Assistant
-      const messages: PromptMessage[] = [...prompts, prompt].map((content) => ({
-        role: "user",
-        content,
-      }));
+      const messages: PromptMessage[] = [...prompts, savedPrompt].map(
+        (content) => ({
+          role: "user",
+          content,
+        })
+      );
 
       // Save the Assistant Message
+      setConversations([
+        {
+          role: "user",
+          content: savedPrompt,
+          timestamp: new Date().toISOString(),
+        },
+        {
+          role: "assistant",
+          content: uiPrompts[0],
+          timestamp: new Date().toISOString(),
+        },
+      ]);
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
           content: initialSteps,
           timestamp: new Date().toISOString(),
+        },
+      ]);
+      setChatHistory((prev) => [
+        ...prev,
+        {
+          _id: newChat._id,
+          isStarred: newChat.isStarred,
+          projectName: newChat.projectName,
+          timestamp: newChat.createdAt,
         },
       ]);
       setCurrentChat(newChat);
@@ -285,6 +361,7 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
   };
 
   // Send the prompt to AI Assistant
+  // Update the sendPrompt function to also update conversations
   const sendPrompt = async (
     chatId: string | undefined,
     messages: PromptMessage[],
@@ -292,10 +369,11 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
   ) => {
     try {
       if (!accessToken && !newAccessToken) return;
-      // New Parser to Parse the Streaming XML Content
       const parser = new StreamingXmlParser();
+      setIsStreaming(true);
 
-      // XML Stream
+      let fullAssistantResponse = ""; // Track the complete response
+
       const stream = await fetch(`${BACKEND_URL}/api/chat/prompt`, {
         method: "POST",
         headers: {
@@ -322,22 +400,30 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
             if (line.startsWith("data: ")) {
               try {
                 const data = JSON.parse(line.slice(6));
-
+              
                 switch (data.type) {
                   case "text_block":
                     accumulatedText += data.delta;
+                    fullAssistantResponse += data.delta; // Accumulate full response
 
-                    // Parse the accumulated text for new steps
                     const newSteps = parser.parseChunk(data.delta);
 
-                    // Add new steps to your state
                     if (newSteps.length > 0) {
                       addStepstoLatestMessage(newSteps);
                     }
                     break;
 
                   case "done":
-                    uploadToS3();
+                    setIsStreaming(false);
+                    // Update conversations when streaming is done
+                    setConversations((prev) => [
+                      ...prev,
+                      {
+                        role: "assistant",
+                        content: fullAssistantResponse,
+                        timestamp: new Date().toISOString(),
+                      },
+                    ]);
                     break;
 
                   case "error":
@@ -356,38 +442,156 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     }
   };
 
+  // Update handleSendPrompt to also update conversations for user message
   const handleSendPrompt = async () => {
     try {
-      const newMessages: ChatMessage[] = [
-        ...messages,
+      if (!currentChat) return;
+
+      const userMessage = {
+        role: "user" as const,
+        content: prompt,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Update messages
+      setMessages((prev) => [...prev, userMessage]);
+
+      // Update conversations with user message
+      setConversations((prev) => [...prev, userMessage]);
+
+      // Build prompt messages from updated conversations
+      const promptMessages: PromptMessage[] = [
+        ...conversations.map((conversation) => ({
+          role: conversation.role,
+          content: conversation.content,
+        })),
         {
           role: "user",
           content: prompt,
-          timestamp: new Date().toISOString(),
         },
       ];
-      setMessages(newMessages);
-      
-      ``
+
+      setPrompt("");
+
+      // Add empty assistant message to messages state
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: [],
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+
+      await sendPrompt(currentChat._id, promptMessages);
     } catch (error) {
       console.error("Error sending prompt");
     }
   };
 
+  const changeChatDetails = async (
+    data: {
+      toggleStarStatus?: boolean;
+      visibilityStatus?: "private" | "public";
+      projectName?: string;
+    },
+    chatId: string
+  ) => {
+    if (!chatId) return;
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/api/chat/modify?id=${chatId}`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": `application/json`,
+          },
+          body: JSON.stringify({ data }),
+        }
+      );
+
+      const responseData = await response.json();
+
+      if (responseData.type !== "success")
+        throw new Error(responseData.message);
+
+      setChatHistory((prevChats) =>
+        prevChats.map((chat) =>
+          chat._id === chatId
+            ? {
+                ...chat,
+                isStarred: data.toggleStarStatus
+                  ? !chat.isStarred
+                  : chat.isStarred,
+                projectName: data.projectName
+                  ? data.projectName
+                  : chat.projectName,
+              }
+            : chat
+        )
+      );
+
+      if (chatId === currentChat?._id) {
+        setCurrentChat((prev) => {
+          if (prev) {
+            const curr = { ...prev };
+            if (data.toggleStarStatus) curr.isStarred = !curr.isStarred;
+            if (data.visibilityStatus)
+              curr.visibilityStatus = data.visibilityStatus;
+            if (data.projectName) curr.projectName = data.projectName;
+            return curr;
+          }
+          return prev;
+        });
+      }
+    } catch (error) {
+      console.error("Error in modifying chat", error);
+    }
+  };
+
+  const deleteChat = async (chatId: string) => {
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/api/chat/delete?id=${chatId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.type !== "success") throw new Error(data.message);
+
+      setChatHistory((prevChats) =>
+        prevChats.filter((chat) => chat._id !== chatId)
+      );
+      if (currentChat?._id === chatId) {
+        setCurrentChat(null);
+        router.replace("/");
+      }
+    } catch (error) {
+      console.error("Error in deleting Chat", error);
+    }
+  };
+
   useEffect(() => {
-    const steps = getLatestSteps();
+    const steps = getLatestStepsFromMessages();
     const pendingSteps = steps.filter(({ status }) => status === "pending");
 
     if (pendingSteps.length === 0) return;
 
     // Deep clone to avoid mutation issues
     const updatedFiles = JSON.parse(JSON.stringify(files));
-    console.log("The updated files are", files);
+
     pendingSteps.forEach((step) => {
       if (step?.type === StepType.CreateFile) {
         const parsedPath = step.path?.split("/").filter(Boolean) ?? [];
         let currentFileStructure = updatedFiles;
-
         let currentFolder = "";
 
         for (let i = 0; i < parsedPath.length; i++) {
@@ -396,13 +600,11 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
           const isLastItem = i === parsedPath.length - 1;
 
           if (isLastItem) {
-            // Final file - update or createchat/id
             const fileIndex = currentFileStructure.findIndex(
               (x: FileItem) => x.path === currentFolder
             );
 
             if (fileIndex === -1) {
-              // Create new file
               currentFileStructure.push({
                 name: currentFolderName,
                 type: "file",
@@ -410,20 +612,17 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
                 content: step.code,
               });
             } else {
-              // Update existing file
               currentFileStructure[fileIndex] = {
                 ...currentFileStructure[fileIndex],
                 content: step.code,
               };
             }
           } else {
-            // Intermediate folder
             let folderIndex = currentFileStructure.findIndex(
               (x: FileItem) => x.path === currentFolder
             );
 
             if (folderIndex === -1) {
-              // Create new folder
               currentFileStructure.push({
                 name: currentFolderName,
                 type: "folder",
@@ -433,7 +632,6 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
               folderIndex = currentFileStructure.length - 1;
             }
 
-            // Navigate into the folder
             currentFileStructure = currentFileStructure[folderIndex].children!;
           }
         }
@@ -442,7 +640,26 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
     saveFiles(updatedFiles);
     updateStepstoLatestMessage();
-  }, [messages, files, getLatestSteps]);
+  }, [messages, saveFiles, getLatestStepsFromMessages]);
+
+  useEffect(() => {
+    if (isStreaming) return;
+
+    const allSteps = getLatestStepsFromMessages();
+    const allCompleted =
+      allSteps.length > 0 &&
+      allSteps.every((step) => step.status === "completed");
+
+    if (allCompleted && !allStepsProcessed) {
+      setAllStepsProcessed(true);
+    }
+  }, [isStreaming, messages, getLatestStepsFromMessages, allStepsProcessed]);
+
+  useEffect(() => {
+    if (allStepsProcessed && filesRef.current.length > 0) {
+      uploadToS3();
+    }
+  }, [allStepsProcessed, uploadToS3]);
 
   const value: ChatContextType = {
     prompt,
@@ -458,6 +675,10 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     messages,
     chatHistory,
     fetchChatsHistory,
+    changeChatDetails,
+    deleteChat,
+    fetchSingleChat,
+    isStreaming,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

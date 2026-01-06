@@ -24,7 +24,7 @@ export default function ProtectedRoute({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (mounted && !isLoading && (!isAuthenticated || !accessToken)) {
-      router.replace("/");
+      router.replace("/auth");
     }
   }, [isAuthenticated, isLoading, accessToken, router, mounted]);
 
