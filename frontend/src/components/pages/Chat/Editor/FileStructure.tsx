@@ -194,7 +194,7 @@ const SearchResults = ({
   if (results.length === 0) {
     return (
       <div className="text-muted-foreground text-sm p-4 text-center">
-        No results found for "{query}"
+        No results found for &quot;{query}&quot;
       </div>
     );
   }

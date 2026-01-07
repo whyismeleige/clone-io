@@ -1,54 +1,25 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import JSZip from "jszip";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ModeToggle } from "@/components/ui/mode-toggle";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAppSelector } from "@/hooks/redux";
 import {
-  History,
   ChevronDown,
   Globe,
-  LockIcon,
-  Pen,
-  Copy,
-  Blend,
   Download,
   Play,
   Code,
-  UserCircle,
-  Bell,
-  LogOut,
-  Settings,
-  HelpCircle,
-  Moon,
-  Sun,
-  Monitor,
   Lock,
   Star,
 } from "lucide-react";
@@ -79,10 +50,34 @@ const zipFoldersRecursive = (files?: FileItem[], folder?: JSZip | null) => {
 export default function AppHeader() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
+  // const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { user } = useAppSelector((state) => state.auth);
   const { files, toggleTabsState, currentChat, changeChatDetails } =
     useChatContext();
+
+  // const handleUploadClick = () => {
+  //   fileInputRef.current?.click();
+  // };
+
+  // const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const selectedFiles = e.target.files;
+  //   if (!selectedFiles || selectedFiles.length === 0 || !currentChat) return;
+
+  //   const formData = new FormData();
+  //   formData.append("snapshot", selectedFiles[0]);
+  //   formData.append("chatId", currentChat._id);
+
+  //   const response = await fetch(`${BACKEND_URL}/api/chat/upload-snapshot`, {
+  //     method: "POST",
+  //     body: formData,
+  //   });
+
+  //   const data = await response.json();
+
+  //   e.target.value = "";
+  // };
+  const isUsersChat = user?._id === currentChat?.createdBy;
 
   const downloadZipFiles = async () => {
     try {
@@ -138,10 +133,10 @@ export default function AppHeader() {
               ) : (
                 <Globe />
               )}
-              <ChevronDown />
+              {isUsersChat && <ChevronDown />}
             </Button>
           </DropdownMenuTrigger>
-          {currentChat && (
+          {isUsersChat && currentChat && (
             <DropdownMenuContent className="w-40">
               <DropdownMenuGroup>
                 <RenameProjectDialog
@@ -187,14 +182,17 @@ export default function AppHeader() {
                     </DropdownMenuItem>
                   );
                 })()}
-                <DropdownMenuSeparator/>
-                <DeleteChatDialog chatId={currentChat._id} projectName={currentChat.projectName} />
+                <DropdownMenuSeparator />
+                <DeleteChatDialog
+                  chatId={currentChat._id}
+                  projectName={currentChat.projectName}
+                />
               </DropdownMenuGroup>
             </DropdownMenuContent>
           )}
         </DropdownMenu>
         <div className="w-1/2 mx-auto flex justify-center">
-          <Tabs defaultValue="code">
+          <Tabs defaultValue="preview">
             <TabsList className="bg-transparent">
               <TabsTrigger
                 onClick={() => toggleTabsState("preview")}
@@ -250,15 +248,41 @@ export default function AppHeader() {
             </TooltipTrigger>
             <TooltipContent>Deploy your Website</TooltipContent>
           </Tooltip> */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Avatar className="cursor-pointer">
-                <AvatarImage src={user?.avatar} alt={user?.name} />
-                <AvatarFallback>CN</AvatarFallback>
-              </Avatar>
-            </DropdownMenuTrigger>
-            <UserDropdown className="w-60" />
-          </DropdownMenu>
+          {/* --- NEW UPLOAD BUTTON --- */}
+          {/* <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="cursor-pointer hidden sm:flex"
+                onClick={handleUploadClick}
+              >
+                <Upload />
+                <span className="sr-only">Upload Files</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Upload Files</TooltipContent>
+          </Tooltip> */}
+          {/* Hidden Input for handling file selection */}
+          {/* <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            className="hidden"
+            multiple // Remove if you only want single file upload
+          /> */}
+
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Avatar className="cursor-pointer">
+                  <AvatarImage src={user?.avatar} alt={user?.name} />
+                  <AvatarFallback>CN</AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <UserDropdown className="w-60" />
+            </DropdownMenu>
+          )}
         </div>
       </div>
     </header>

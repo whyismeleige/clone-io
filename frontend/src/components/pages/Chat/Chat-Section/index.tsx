@@ -1,22 +1,14 @@
 "use client";
-import { ModelCombobox } from "@/components/shared/ModelCombobox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupTextarea,
-} from "@/components/ui/input-group";
 import { Spinner } from "@/components/ui/spinner";
-import { ArrowUp, CircleCheckBig } from "lucide-react";
+import { CircleCheckBig } from "lucide-react";
 import { useChatContext } from "@/context/chat.context";
-import { useAppSelector } from "@/hooks/redux";
 import { useRef, useEffect } from "react";
+import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item";
 
 export default function ChatSection() {
-  const { user } = useAppSelector((state) => state.auth);
-  const { messages, prompt, setPrompt, handleSendPrompt } = useChatContext();
+  const { messages, currentChat } = useChatContext();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -37,7 +29,7 @@ export default function ChatSection() {
               key={index}
             >
               <Avatar>
-                <AvatarImage src={user?.avatar} alt={user?.name} />
+                <AvatarImage src={currentChat?.createdBy?.avatar} alt={currentChat?.createdBy?.name} />
                 <AvatarFallback>CN</AvatarFallback>
               </Avatar>
               <span className="rounded-md p-3 border bg-background shadow-xs hover:bg-accent dark:bg-input/30 dark:border-input dark:hover:bg-input/50">
@@ -85,43 +77,51 @@ export default function ChatSection() {
         )}
         <div ref={messagesEndRef} />
       </div>
-      <InputBox
-        prompt={prompt}
-        setPrompt={setPrompt}
-        sendPrompt={handleSendPrompt}
-      />
+      <Item variant="outline">
+        <ItemMedia>
+          <Avatar className="size-10">
+            <AvatarImage src={currentChat?.createdBy?.avatar} alt={currentChat?.createdBy?.name} />
+            <AvatarFallback>ER</AvatarFallback>
+          </Avatar>
+        </ItemMedia>
+        <ItemContent>
+          <ItemTitle>Created By</ItemTitle>
+          <ItemDescription>{currentChat?.createdBy?.name}</ItemDescription>
+        </ItemContent>
+      </Item>
     </section>
   );
 }
 
-function InputBox({
-  prompt,
-  setPrompt,
-  sendPrompt,
-}: {
-  prompt: string;
-  setPrompt: (value: string) => void;
-  sendPrompt: () => void;
-}) {
-  return (
-    <InputGroup>
-      <InputGroupTextarea
-        placeholder="Build with Clone"
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-      />
-      <InputGroupAddon align="block-end">
-        <ModelCombobox />
-        <InputGroupButton
-          variant="default"
-          className="ml-auto rounded-full cursor-pointer"
-          size="icon-xs"
-          onClick={sendPrompt}
-          disabled={!prompt}
-        >
-          <ArrowUp />
-        </InputGroupButton>
-      </InputGroupAddon>
-    </InputGroup>
-  );
-}
+// function InputBox({
+//   prompt,
+//   setPrompt,
+//   sendPrompt,
+// }: {
+//   prompt: string;
+//   setPrompt: (value: string) => void;
+//   sendPrompt: () => void;
+// }) {
+//   return (
+//     <InputGroup>
+//       <InputGroupTextarea
+//         placeholder="Build with Clone"
+//         value={prompt}
+//         disabled
+//         onChange={(e) => setPrompt(e.target.value)}
+//       />
+//       <InputGroupAddon align="block-end">
+//         <ModelCombobox />
+//         <InputGroupButton
+//           variant="default"
+//           className="ml-auto rounded-full cursor-pointer"
+//           size="icon-xs"
+//           onClick={sendPrompt}
+//           disabled
+//         >
+//           <ArrowUp />
+//         </InputGroupButton>
+//       </InputGroupAddon>
+//     </InputGroup>
+//   );
+// }

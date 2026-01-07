@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/resizable";
 import FileStructure from "./FileStructure";
 import CodeEditor from "./CodeEditor";
-import Terminal from "./Terminal";
+// import Terminal from "./Terminal";
 
 export default function Editor() {
   return (

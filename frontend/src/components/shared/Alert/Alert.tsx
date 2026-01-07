@@ -46,12 +46,12 @@ const Alert: React.FC<AlertProps> = ({ alert }) => {
     return () => clearInterval(interval);
   }, [alert]);
 
-  const handleClose = (): void => {
-    setIsLeaving(true);
-    setTimeout(() => {
-      removeAlert(alert.id);
-    }, 300);
-  };
+  // const handleClose = (): void => {
+  //   setIsLeaving(true);
+  //   setTimeout(() => {
+  //     removeAlert(alert.id);
+  //   }, 300);
+  // };
 
   const getIcon = () => {
     switch (alert.type) {

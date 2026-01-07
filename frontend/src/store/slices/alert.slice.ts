@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Alert, AlertOptions } from "@/types/alert.types";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 

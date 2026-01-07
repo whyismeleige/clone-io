@@ -12,9 +12,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -43,32 +41,25 @@ import { useAppSelector } from "@/hooks/redux";
 import { useMounted } from "@/hooks/useMounted";
 import { User } from "@/types/auth.types";
 import { ChatHistory } from "@/types/chat.types";
-import { SiAnthropic, SiGithub } from "@icons-pack/react-simple-icons";
+import { SiGithub } from "@icons-pack/react-simple-icons";
 import {
-  Bell,
-  CreditCard,
   EllipsisVertical,
-  LogOut,
   Minus,
   Plus,
   PlusCircle,
-  Settings,
-  UserCircle,
   Star,
-  Edit2,
-  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-const dummyChatHistory: ChatHistory[] = Array(100)
-  .fill(null)
-  .map(() => ({
-    _id: "UUID-" + Math.floor(Math.random() * 100).toString(),
-    projectName: "Project-" + Math.floor(Math.random() * 100).toString(),
-    isStarred: Math.floor(Math.random() * 100) <= 50,
-    timestamp: new Date().toISOString(),
-  }));
+// const dummyChatHistory: ChatHistory[] = Array(100)
+//   .fill(null)
+//   .map(() => ({
+//     _id: "UUID-" + Math.floor(Math.random() * 100).toString(),
+//     projectName: "Project-" + Math.floor(Math.random() * 100).toString(),
+//     isStarred: Math.floor(Math.random() * 100) <= 50,
+//     timestamp: new Date().toISOString(),
+//   }));
 
 export default function AppSidebar() {
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
@@ -235,7 +226,7 @@ const NavStarred = ({ chats }: { chats: ChatHistory[] }) => {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <SidebarMenuSub>
-                  {chats.map((chat, index) => (
+                  {chats.map((chat) => (
                     <ChatItemWithDropdown key={chat._id} chat={chat} />
                   ))}
                 </SidebarMenuSub>
@@ -264,7 +255,7 @@ const NavRecent = ({ chats }: { chats: ChatHistory[] }) => {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <SidebarMenuSub>
-                  {chats.map((chat, index) => (
+                  {chats.map((chat) => (
                     <ChatItemWithDropdown key={chat._id} chat={chat} />
                   ))}
                 </SidebarMenuSub>

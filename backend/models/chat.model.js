@@ -141,6 +141,11 @@ ChatSchema.methods.modifyChat = async function (data) {
   return await this.save();
 };
 
+ChatSchema.methods.saveSnapshot = async function (cdnUrl) {
+  this.snapshot = cdnUrl;
+  await this.save();
+}
+
 ChatSchema.methods.saveConversation = async function (role, content) {
   this.conversations.push({ role, content });
   await this.save();

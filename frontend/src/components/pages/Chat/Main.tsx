@@ -8,13 +8,30 @@ import {
 import Editor from "./Editor";
 import ChatSection from "./Chat-Section";
 import PreviewFrame from "./Preview";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { FileItem } from "@/types";
 import { useWebContainer } from "@/hooks/useWebContainer";
 import { cn } from "@/lib/utils";
 import { useChatContext } from "@/context/chat.context";
-import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  useParams,
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
 import { useMounted } from "@/hooks/useMounted";
+
+type MountFile = {
+  file: {
+    contents: string;
+  };
+};
+
+type MountDirectory = {
+  directory: Record<string, MountFile | MountDirectory>;
+};
+
+type MountStructure = Record<string, MountFile | MountDirectory>;
 
 export default function AppMain() {
   const params = useParams();
@@ -24,9 +41,11 @@ export default function AppMain() {
   const chatId = params?.id as string;
   const isNewChat = searchParams.get("new") === "true";
 
-  const { tabsState, files, newChat, fetchSingleChat } = useChatContext();
+  const { tabsState, files, fetchSingleChat, isChatLoading } = useChatContext();
   const { webcontainer, error } = useWebContainer();
   const isMounted = useMounted();
+
+  const [isFilesMounted, setIsFilesMounted] = useState(false);
 
   useEffect(() => {
     const intializeChat = async () => {
@@ -42,52 +61,70 @@ export default function AppMain() {
         });
       }
 
-      if(!isNewChat) {
-        await fetchSingleChat(chatId)
+      if (!isNewChat) {
+        // When fetching new chat, reset mount status
+        setIsFilesMounted(false);
+        await fetchSingleChat(chatId);
       }
     };
     intializeChat();
-  }, [isMounted]);
+  }, [
+    isMounted,
+    chatId,
+    fetchSingleChat,
+    isNewChat,
+    pathname,
+    router,
+    searchParams,
+  ]);
 
   useEffect(() => {
-    const createMountStructure = (files: FileItem[]): Record<string, any> => {
-      const mountStructure: Record<string, any> = {};
+    if (isChatLoading || files.length === 0 || !webcontainer) return;
 
-      const processFile = (file: FileItem, isRootFolder: boolean) => {
+    const createMountStructure = (files: FileItem[]): MountStructure => {
+      const mountStructure: MountStructure = {};
+
+      const processFile = (file: FileItem): MountFile | MountDirectory => {
         if (file.type === "folder") {
-          mountStructure[file.name] = {
+          return {
             directory: file.children
               ? Object.fromEntries(
-                  file.children.map((child) => [
-                    child.name,
-                    processFile(child, false),
-                  ])
+                  file.children.map((child) => [child.name, processFile(child)])
                 )
               : {},
           };
-        } else if (file.type === "file") {
-          if (isRootFolder) {
-            mountStructure[file.name] = {
-              file: {
-                contents: file.content || "",
-              },
-            };
-          } else {
-            return {
-              file: {
-                contents: file.content || "",
-              },
-            };
-          }
+        } else {
+          // file.type === "file"
+          return {
+            file: {
+              contents: file.content || "",
+            },
+          };
         }
-        return mountStructure[file.name];
       };
-      files.forEach((file) => processFile(file, true));
+
+      files.forEach((file) => {
+        mountStructure[file.name] = processFile(file);
+      });
+
       return mountStructure;
     };
+
     const mountStructure = createMountStructure(files);
-    webcontainer?.mount(mountStructure);
-  }, [webcontainer, files]);
+
+    // 2. Wrap mount in an async function to await it
+    const mountFiles = async () => {
+      try {
+        await webcontainer.mount(mountStructure);
+        // 3. Only set this to true AFTER mount completes
+        setIsFilesMounted(true);
+      } catch (err) {
+        console.error("Failed to mount files", err);
+      }
+    };
+
+    mountFiles();
+  }, [webcontainer, files, isChatLoading]);
 
   return (
     <div className="flex w-screen flex-col h-screen">

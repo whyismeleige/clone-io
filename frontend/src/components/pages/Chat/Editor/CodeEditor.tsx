@@ -44,7 +44,7 @@ export default function CodeEditor() {
   );
 }
 
-function FilesBreadcrumb({ path, currentPath }: { path?: string[]; currentPath?: string }) {
+function FilesBreadcrumb({ path,  }: { path?: string[]; currentPath?: string }) {
   const { files, changeCurrentFile } = useChatContext();
   
   // Get children at specific depth level

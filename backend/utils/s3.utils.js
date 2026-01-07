@@ -3,6 +3,7 @@ const { GetObjectCommand, PutObjectCommand } = require("@aws-sdk/client-s3");
 const s3Client = require("../config/s3.config");
 
 const BUCKET_NAME = process.env.S3_BUCKET_NAME;
+const CDN_URL = process.env.CDN_URL;
 const AWS_REGION = process.env.AWS_REGION;
 
 async function getS3TextFile(key) {
@@ -35,6 +36,24 @@ async function uploadS3File(key, file, metadata) {
   const s3URL = `https://${BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/${key}`;
 
   return s3URL;
+}
+
+async function uploadSnapshot(chatId, fileName, buffer, mimeType) {
+  // Construct the key as per requirements
+  // Note: We are saving it as 'image' without extension, relying on ContentType
+  const key = `snapshots/${chatId}/ss/${fileName}`;
+
+  const command = new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+    Body: buffer,
+    ContentType: mimeType,
+    CacheControl: "public, max-age=3600",
+  });
+
+  await s3Client.send(command);
+
+  return `${CDN_URL}/${key}`;
 }
 
 function getContentType(filename) {
@@ -137,4 +156,4 @@ function isBinaryFile(contentType, filename) {
   return binaryExtensions.some((ext) => filename.toLowerCase().endsWith(ext));
 }
 
-module.exports = { uploadS3File, getS3TextFile };
+module.exports = { uploadS3File, uploadSnapshot, getS3TextFile };

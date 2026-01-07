@@ -1,6 +1,5 @@
 "use client";
 import GithubLoginButton from "@/components/shared/Auth/GithubLogin";
-import GoogleLoginButton from "@/components/shared/Auth/GoogleLogin";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -12,7 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { useChatContext } from "@/context/chat.context";
-import { useAppDispatch, useAppSelector } from "@/hooks/redux";
+import { useAppDispatch } from "@/hooks/redux";
 import {
   loginUser,
   registerUser,

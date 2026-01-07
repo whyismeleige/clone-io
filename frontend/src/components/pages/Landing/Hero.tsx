@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { ArrowUp, PlusIcon, ExternalLink, Star, Eye } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TextEffect } from "@/components/motion-primitives/text-effect";
 import {
@@ -21,7 +21,7 @@ import { useAppSelector } from "@/hooks/redux";
 import { useRouter } from "next/navigation";
 import { useChatContext } from "@/context/chat.context";
 import { Spinner } from "@/components/ui/spinner";
-import { Chat } from "@/types/chat.types";
+import { BACKEND_URL } from "@/utils/config";
 
 const phrases = [
   `Recreate the minimal, clean style of https://www.notion.so for a productivity tool website.`,
@@ -36,124 +36,54 @@ const phrases = [
   "Design a minimalist e-commerce site with product grid, filters, and checkout flow.",
 ];
 
-// Mock data for public projects - replace with actual API call
-const mockPublicProjects: Chat[] = [
-  {
-    _id: "1",
-    projectName: "AI Model Agent Platform",
-    projectS3Url: null,
-    model: "claude-4.5-opus",
-    conversations: [],
-    visibilityStatus: "public",
-    isStarred: false,
-    isDeployed: true,
-    deploymentLink: "https://example.com/ai-platform",
-    lastActivity: "2024-01-05T10:30:00Z",
-    status: "active",
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-05T10:30:00Z",
-  },
-  {
-    _id: "2",
-    projectName: "Vincyiq.ai Website Builder",
-    projectS3Url: null,
-    model: "claude-4-sonnet",
-    conversations: [],
-    visibilityStatus: "public",
-    isStarred: false,
-    isDeployed: true,
-    deploymentLink: "https://example.com/vincyiq",
-    lastActivity: "2024-01-04T15:20:00Z",
-    status: "active",
-    createdAt: "2023-12-28T00:00:00Z",
-    updatedAt: "2024-01-04T15:20:00Z",
-  },
-  {
-    _id: "3",
-    projectName: "Enhanced Better Listing AI",
-    projectS3Url: null,
-    model: "claude-4-sonnet",
-    conversations: [],
-    visibilityStatus: "public",
-    isStarred: false,
-    isDeployed: true,
-    deploymentLink: "https://example.com/listing-ai",
-    lastActivity: "2024-01-03T08:45:00Z",
-    status: "active",
-    createdAt: "2023-12-25T00:00:00Z",
-    updatedAt: "2024-01-03T08:45:00Z",
-  },
-  {
-    _id: "4",
-    projectName: "Rentsnova Housing Platform",
-    projectS3Url: null,
-    model: "claude-4-opus",
-    conversations: [],
-    visibilityStatus: "public",
-    isStarred: false,
-    isDeployed: true,
-    deploymentLink: "https://example.com/rentsnova",
-    lastActivity: "2024-01-02T12:00:00Z",
-    status: "active",
-    createdAt: "2023-12-20T00:00:00Z",
-    updatedAt: "2024-01-02T12:00:00Z",
-  },
-  {
-    _id: "5",
-    projectName: "Using Claude Artifacts",
-    projectS3Url: null,
-    model: "claude-4.5-sonnet",
-    conversations: [],
-    visibilityStatus: "public",
-    isStarred: false,
-    isDeployed: true,
-    deploymentLink: "https://example.com/artifacts",
-    lastActivity: "2024-01-01T16:30:00Z",
-    status: "active",
-    createdAt: "2023-12-15T00:00:00Z",
-    updatedAt: "2024-01-01T16:30:00Z",
-  },
-  {
-    _id: "6",
-    projectName: "Investment Agriculture Platform",
-    projectS3Url: null,
-    model: "claude-4-sonnet",
-    conversations: [],
-    visibilityStatus: "public",
-    isStarred: false,
-    isDeployed: true,
-    deploymentLink: "https://example.com/agriculture",
-    lastActivity: "2023-12-31T09:15:00Z",
-    status: "active",
-    createdAt: "2023-12-10T00:00:00Z",
-    updatedAt: "2023-12-31T09:15:00Z",
-  },
-];
-
 interface ProjectCardProps {
-  project: Chat;
+  project: PublicProject;
   index: number;
+  onClick: () => void;
 }
 
-const ProjectCard: React.FC<ProjectCardProps> = ({ project, index }) => {
+interface PublicProject {
+  _id: string;
+  projectName: string;
+  snapshot: string;
+  model: string;
+  views: number;
+  createdBy: string;
+  creator: {
+    _id: string;
+    name: string;
+    avatar: string;
+  };
+  deployedAt: string;
+  lastActivity: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const ProjectCard: React.FC<ProjectCardProps> = ({
+  project,
+  index,
+  onClick,
+}) => {
   const router = useRouter();
   const [imageError, setImageError] = useState(false);
 
   return (
     <div
       className="group relative cursor-pointer"
-      onClick={() => router.push(`/chat/${project._id}`)}
+      onClick={() => {
+        onClick();
+        router.push(`/chat/${project._id}`);
+      }}
       style={{
         animationDelay: `${index * 100}ms`,
       }}
     >
       {/* Project Preview/Thumbnail */}
       <div className="relative mb-3 aspect-video w-full overflow-hidden rounded-lg bg-muted/30 ring-1 ring-border/40 transition-all duration-300 group-hover:ring-border/60 group-hover:shadow-md">
-        {!imageError && project.deploymentLink ? (
+        {!imageError && project.snapshot ? (
           <img
-            src={`https://api.microlink.io?url=${encodeURIComponent(
-              project.deploymentLink
-            )}&screenshot=true&meta=false&embed=screenshot.url`}
+            src={project.snapshot}
             alt={project.projectName}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
             onError={() => setImageError(true)}
@@ -165,22 +95,16 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, index }) => {
             </div>
           </div>
         )}
-        
+
         {/* Overlay on hover */}
         <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-        
-        {/* External link button */}
-        {project.deploymentLink && (
-          <button
-            className="absolute top-3 right-3 rounded-full bg-background/90 p-2 opacity-0 shadow-sm ring-1 ring-border/50 backdrop-blur-sm transition-all duration-300 hover:bg-background hover:scale-110 group-hover:opacity-100"
-            onClick={(e) => {
-              e.stopPropagation();
-              window.open(project.deploymentLink!, "_blank");
-            }}
-          >
-            <ExternalLink className="h-3.5 w-3.5 text-foreground/70" />
+
+        {/* View Project Button */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+          <button className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg transition-transform duration-200 hover:scale-105">
+            View Project
           </button>
-        )}
+        </div>
       </div>
 
       {/* Project Info */}
@@ -189,29 +113,20 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, index }) => {
           {project.projectName}
         </h3>
 
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div className="flex items-center text-sm text-muted-foreground">
           <span className="text-xs tracking-wide">
-            {project.model.replace('claude-', '').toUpperCase()}
+            {project.views.toLocaleString()} views
           </span>
-          
-          {project.isDeployed && (
-            <span className="flex items-center gap-1.5 text-xs">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-medium">Live</span>
-            </span>
-          )}
         </div>
       </div>
     </div>
   );
 };
-
 export default function HeroMain() {
   const [placeholder, setPlaceholder] = useState("");
   const [showTabBtn, toggleShowTabBtn] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [publicProjects, setPublicProjects] =
-    useState<Chat[]>(mockPublicProjects);
+  const [publicProjects, setPublicProjects] = useState<PublicProject[]>([]);
 
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const { prompt, setPrompt, newChat } = useChatContext();
@@ -221,12 +136,10 @@ export default function HeroMain() {
     if (prompt !== "") return;
 
     let shouldStop = false;
-    let phraseToSet = "";
 
     const runAnimations = async () => {
       while (!shouldStop) {
         for (const phrase of phrases) {
-          phraseToSet = phrase;
           if (shouldStop) break;
           await animate(0, phrase.length, {
             onUpdate: (latest) => {
@@ -270,17 +183,15 @@ export default function HeroMain() {
 
   // Fetch public projects - replace with actual API call
   useEffect(() => {
-    // TODO: Replace with actual API call
-    // const fetchPublicProjects = async () => {
-    //   try {
-    //     const response = await fetch('/api/projects/public');
-    //     const data = await response.json();
-    //     setPublicProjects(data);
-    //   } catch (error) {
-    //     console.error('Error fetching public projects:', error);
-    //   }
-    // };
-    // fetchPublicProjects();
+    const fetchPublicProjects = async () => {
+      const response = await fetch(`${BACKEND_URL}/api/chat/public`);
+
+      const data = await response.json();
+
+      setPublicProjects(data.projects);
+    };
+
+    fetchPublicProjects();
   }, []);
 
   const handlePrompt = async () => {
@@ -296,6 +207,12 @@ export default function HeroMain() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const incrementViewCount = async (projectId: string) => {
+    await fetch(`${BACKEND_URL}/api/chat/public/${projectId}/view`, {
+      method: "PATCH",
+    });
   };
 
   return (
@@ -337,7 +254,7 @@ export default function HeroMain() {
                 Create or Clone websites with AI
               </TextEffect>
               <div className="mt-10 flex-1 w-full max-w-2xl">
-                <InputGroup >
+                <InputGroup>
                   <InputGroupTextarea
                     placeholder={placeholder}
                     value={prompt}
@@ -346,7 +263,12 @@ export default function HeroMain() {
                   />
                   {showTabBtn && (
                     <div className="absolute top-2 right-2 flex flex-wrap items-center gap-4">
-                      <Button disabled variant="outline" size="sm" className="pr-2">
+                      <Button
+                        disabled
+                        variant="outline"
+                        size="sm"
+                        className="pr-2"
+                      >
                         Tab <Kbd>⭾</Kbd>
                       </Button>
                     </div>
@@ -407,11 +329,10 @@ export default function HeroMain() {
                   key={project._id}
                   project={project}
                   index={index}
+                  onClick={() => incrementViewCount(project._id)}
                 />
               ))}
             </div>
-
-            
           </div>
         </div>
       </section>

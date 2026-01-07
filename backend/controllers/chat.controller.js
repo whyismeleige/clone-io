@@ -10,8 +10,7 @@ const {
   ExternalAPIError,
   NotFoundError,
 } = require("../utils/errors.utils");
-const { dummyPromptData } = require("../utils/dummyData");
-const { uploadS3File, getS3TextFile } = require("../utils/s3.utils");
+const { uploadS3File, getS3TextFile, uploadSnapshot } = require("../utils/s3.utils");
 const anthropic = new Anthropic();
 
 const User = db.user;
@@ -145,53 +144,51 @@ exports.sendPrompt = asyncHandler(async (req, res) => {
 
     const MAX_TOKENS = process.env.NODE_ENV !== "production" ? 16000 : 200;
 
-    if (process.env.NODE_ENV !== "production") {
-      // Dummy response data
-      const dummyResponse = dummyPromptData;
+    // if (process.env.NODE_ENV !== "production") {
+    //   // Dummy response data
+    //   const fullText = dummyResponse.content[0].text;
 
-      const fullText = dummyResponse.content[0].text;
+    //   // Simulate message_start
+    //   res.write(
+    //     `data: ${JSON.stringify({
+    //       type: "message_start",
+    //       message: dummyResponse,
+    //     })}\n\n`
+    //   );
 
-      // Simulate message_start
-      res.write(
-        `data: ${JSON.stringify({
-          type: "message_start",
-          message: dummyResponse,
-        })}\n\n`
-      );
+    //   // Simulate streaming text in chunks
+    //   const chunkSize = 50;
+    //   for (let i = 0; i < fullText.length; i += chunkSize) {
+    //     const length = Math.min(fullText.length - 1, i + chunkSize);
+    //     const chunk = fullText.slice(i, length);
 
-      // Simulate streaming text in chunks
-      const chunkSize = 50;
-      for (let i = 0; i < fullText.length; i += chunkSize) {
-        const length = Math.min(fullText.length - 1, i + chunkSize);
-        const chunk = fullText.slice(i, length);
+    //     res.write(
+    //       `data: ${JSON.stringify({
+    //         type: "text_block",
+    //         delta: chunk,
+    //       })}\n\n`
+    //     );
 
-        res.write(
-          `data: ${JSON.stringify({
-            type: "text_block",
-            delta: chunk,
-          })}\n\n`
-        );
+    //     // Add small delay to simulate streaming
+    //     await new Promise((resolve) => setTimeout(resolve, 50));
+    //   }
 
-        // Add small delay to simulate streaming
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      }
+    //   // Save conversation
+    //   await chat.saveConversation("assistant", fullText);
 
-      // Save conversation
-      await chat.saveConversation("assistant", fullText);
+    //   // Send final message
+    //   res.write(
+    //     `data: ${JSON.stringify({
+    //       type: "done",
+    //       message: dummyResponse,
+    //       fullText,
+    //       truncated: dummyResponse.stop_reason === "max_tokens",
+    //     })}\n\n`
+    //   );
 
-      // Send final message
-      res.write(
-        `data: ${JSON.stringify({
-          type: "done",
-          message: dummyResponse,
-          fullText,
-          truncated: dummyResponse.stop_reason === "max_tokens",
-        })}\n\n`
-      );
-
-      res.end();
-      return;
-    }
+    //   res.end();
+    //   return;
+    // }
 
     const stream = await anthropic.messages.stream({
       messages,
@@ -342,13 +339,10 @@ exports.createTemplate = asyncHandler(async (req, res) => {
 exports.fetchChat = asyncHandler(async (req, res) => {
   const chatId = req.query.id;
 
-  const chat = await Chat.findById(chatId).populate({
-    path: "createdBy",
-    transform: (doc) => {
-      if (!doc) return;
-      sanitizeUser(doc);
-    },
-  });
+  const chat = await Chat.findById(chatId).populate("createdBy")
+  if (chat?.createdBy) {
+  sanitizeUser(chat.createdBy);
+}
 
   if (!chat) {
     throw new ValidationError("Chat does not exist");
@@ -356,8 +350,8 @@ exports.fetchChat = asyncHandler(async (req, res) => {
 
   const files = await fetchAndTransformProjectFiles(
     chat.projectFiles,
-    req.user._id,
-    chatId
+    chat.createdBy._id.toString(),
+    chatId.toString()
   );
 
   res.status(200).send({
@@ -414,10 +408,7 @@ exports.getPublicProjects = asyncHandler(async (req, res) => {
       },
     },
     {
-      $sort: { views: -1 },
-    },
-    {
-      $limit: parseInt(limit),
+      $sample: { size: parseInt(limit) }
     },
     {
       $lookup: {
@@ -434,6 +425,12 @@ exports.getPublicProjects = asyncHandler(async (req, res) => {
         model: 1,
         views: 1,
         createdBy: 1,
+        creator: {
+          _id: 1,
+          name: 1,
+          avatar: 1,
+
+        },
         deployedAt: 1,
         lastActivity: 1,
         createdAt: 1,
@@ -474,6 +471,30 @@ exports.incrementViewCount = asyncHandler(async (req, res) => {
   res.status(200).send({
     message: "View count incremented",
     type: "success",
+  });
+});
+
+exports.uploadPreviewSnapshot = asyncHandler(async (req, res) => {
+  const { chatId } = req.body;
+  const file = req.file;
+
+  if (!chatId || !file) {
+    throw new ValidationError("Snapshot is required");
+  }
+
+  const chat = await Chat.findById(chatId);
+
+  if(!chat) {
+    throw NotFoundError("Chat not found");
+  }
+
+  // Call the utility function
+  const url = await uploadSnapshot(chatId,file.originalname, file.buffer, file.mimetype);
+
+  await chat.saveSnapshot(url);
+  res.status(200).json({
+    message: "Snapshot uploaded successfully",
+    url: url,
   });
 });
 

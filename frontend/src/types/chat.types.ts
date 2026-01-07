@@ -67,7 +67,7 @@ export interface Chat {
   isStarred: boolean;
   isDeployed: boolean;
   deployedAt?: string | null;
-  createdBy?: User | null | string;
+  createdBy?: User;
   lastActivity: string;
   status: "active" | "archived" | "deleted";
   createdAt: string;
@@ -99,5 +99,5 @@ export interface ChatContextType {
   deleteChat: (chatId: string) => Promise<void>;
   fetchSingleChat: (chatId: string) => Promise<void>;
   isStreaming: boolean;
-  
+  isChatLoading: boolean;
 }

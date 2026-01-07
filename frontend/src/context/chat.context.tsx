@@ -69,22 +69,22 @@ const getInitialFile = (nodes: FileItem[]): FileItem => {
   return nodes[0].children ? getInitialFile(nodes[0].children) : nodes[0];
 };
 
-const flattenFileStructure = (
-  files: FileItem[],
-  result: Array<{ path: string; content: string }> = []
-) => {
-  for (const file of files) {
-    if (file.type === "file" && file.content !== undefined) {
-      result.push({
-        path: file.path.startsWith("/") ? file.path.slice(1) : file.path,
-        content: file.content,
-      });
-    } else if (file.type === "folder" && file.children) {
-      flattenFileStructure(file.children, result);
-    }
-  }
-  return result;
-};
+// const flattenFileStructure = (
+//   files: FileItem[],
+//   result: Array<{ path: string; content: string }> = []
+// ) => {
+//   for (const file of files) {
+//     if (file.type === "file" && file.content !== undefined) {
+//       result.push({
+//         path: file.path.startsWith("/") ? file.path.slice(1) : file.path,
+//         content: file.content,
+//       });
+//     } else if (file.type === "folder" && file.children) {
+//       flattenFileStructure(file.children, result);
+//     }
+//   }
+//   return result;
+// };
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
@@ -112,12 +112,13 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [currentChat, setCurrentChat] = useState<Chat | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
-  const [tabsState, toggleTabsState] = useState<TabsState>("code");
+  const [tabsState, toggleTabsState] = useState<TabsState>("preview");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [currentFile, changeCurrentFile] = useState<FileItem | null>(null);
   const [allStepsProcessed, setAllStepsProcessed] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isChatLoading, setIsChatLoading] = useState(false);
 
   const filesRef = useRef<FileItem[]>(files);
   const currentChatRef = useRef<Chat | null>(currentChat);
@@ -158,7 +159,7 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
         if (updated[lastIndex].role === "assistant") {
           updated[lastIndex] = {
             ...updated[lastIndex],
-            content: [...(updated[lastIndex] as any).content, ...newSteps],
+            content: [...updated[lastIndex].content, ...newSteps],
           };
         }
         return updated;
@@ -191,37 +192,37 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
   };
 
   // Upload files to S3
-  const uploadToS3 = useCallback(
-    async (newAccessToken?: string | null) => {
-      const authToken = accessTokenRef.current || newAccessToken;
-      const currentFilesData = filesRef.current;
-      const currentChatData = currentChatRef.current;
+  // const uploadToS3 = useCallback(
+  //   async (newAccessToken?: string | null) => {
+  //     const authToken = accessTokenRef.current || newAccessToken;
+  //     const currentFilesData = filesRef.current;
+  //     const currentChatData = currentChatRef.current;
 
-      if (!currentChatData || !authToken || currentFilesData.length === 0) {
-        return;
-      }
+  //     if (!currentChatData || !authToken || currentFilesData.length === 0) {
+  //       return;
+  //     }
 
-      const flattenedFiles = flattenFileStructure(currentFilesData);
+  //     const flattenedFiles = flattenFileStructure(currentFilesData);
 
-      try {
-        const response = await fetch(
-          `${BACKEND_URL}/api/chat/upload-project-files?id=${currentChatData._id}`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${authToken}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ files: flattenedFiles }),
-          }
-        );
-        const data = await response.json();
-      } catch (error) {
-        console.error("Upload error:", error);
-      }
-    },
-    [] // No dependencies needed since we use refs
-  );
+  //     try {
+  //       const response = await fetch(
+  //         `${BACKEND_URL}/api/chat/upload-project-files?id=${currentChatData._id}`,
+  //         {
+  //           method: "POST",
+  //           headers: {
+  //             Authorization: `Bearer ${authToken}`,
+  //             "Content-Type": "application/json",
+  //           },
+  //           body: JSON.stringify({ files: flattenedFiles }),
+  //         }
+  //       );
+  //       const data = await response.json();
+  //     } catch (error) {
+  //       console.error("Upload error:", error);
+  //     }
+  //   },
+  //   [] // No dependencies needed since we use refs
+  // );
 
   // Fetch Chats List
   const fetchChatsHistory = useCallback(async () => {
@@ -244,29 +245,37 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
   }, [accessToken]);
 
   // Fetch Single Chat by Id
-  const fetchSingleChat = async (chatId: string) => {
-    try {
-      const response = await fetch(
-        `${BACKEND_URL}/api/chat/history?id=${chatId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
-      const data = await response.json();
+  const fetchSingleChat = useCallback(
+    async (chatId: string) => {
+      try {
+        setIsChatLoading(true);
+        const response = await fetch(
+          `${BACKEND_URL}/api/chat/history?id=${chatId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        );
+        const data = await response.json();
 
-      if (data.type !== "success") throw new Error(data.message);
+        if (data.type !== "success") throw new Error(data.message);
 
-      setCurrentChat(data.chat);
-      setConversations(data.chat.conversations);
-      setMessages(convertConversationsToChatMessages(data.chat.conversations));
-      saveFiles(data.files);
-    } catch (error) {
-      console.error("Error in fetching chat", error);
-      router.replace("/");
-    }
-  };
+        setCurrentChat(data.chat);
+        setConversations(data.chat.conversations);
+        setMessages(
+          convertConversationsToChatMessages(data.chat.conversations)
+        );
+        saveFiles(data.files);
+      } catch (error) {
+        console.error("Error in fetching chat", error);
+        router.replace("/");
+      } finally {
+        setIsChatLoading(false);
+      }
+    },
+    [accessToken, router, saveFiles]
+  );
 
   // Start of the New Chat
   const newChat = async (
@@ -386,7 +395,6 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       if (stream.body) {
         const reader = stream.body.getReader();
         const decoder = new TextDecoder();
-        let accumulatedText = "";
 
         while (true) {
           const { done, value } = await reader.read();
@@ -400,10 +408,9 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
             if (line.startsWith("data: ")) {
               try {
                 const data = JSON.parse(line.slice(6));
-              
+
                 switch (data.type) {
                   case "text_block":
-                    accumulatedText += data.delta;
                     fullAssistantResponse += data.delta; // Accumulate full response
 
                     const newSteps = parser.parseChunk(data.delta);
@@ -640,7 +647,7 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
     saveFiles(updatedFiles);
     updateStepstoLatestMessage();
-  }, [messages, saveFiles, getLatestStepsFromMessages]);
+  }, [messages, saveFiles, getLatestStepsFromMessages, files]);
 
   useEffect(() => {
     if (isStreaming) return;
@@ -654,12 +661,6 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
       setAllStepsProcessed(true);
     }
   }, [isStreaming, messages, getLatestStepsFromMessages, allStepsProcessed]);
-
-  useEffect(() => {
-    if (allStepsProcessed && filesRef.current.length > 0) {
-      uploadToS3();
-    }
-  }, [allStepsProcessed, uploadToS3]);
 
   const value: ChatContextType = {
     prompt,
@@ -679,6 +680,7 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
     deleteChat,
     fetchSingleChat,
     isStreaming,
+    isChatLoading,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

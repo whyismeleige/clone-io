@@ -3,15 +3,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
-  Bell,
-  HelpCircle,
-  LogOut,
   Menu,
-  Monitor,
-  Moon,
-  Settings,
-  Sun,
-  UserCircle,
   X,
   Info,
 } from "lucide-react";
@@ -26,14 +18,6 @@ import {
 import { useAppSelector } from "@/hooks/redux";
 import {
   DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";

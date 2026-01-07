@@ -4,7 +4,7 @@ import { useChatContext } from "@/context/chat.context";
 import { useAppDispatch } from "@/hooks/redux";
 import { exchangeOAuthCode, TokenService } from "@/store/slices/auth.slice";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 export default function AuthCallback() {
   const searchParams = useSearchParams();
@@ -31,7 +31,7 @@ export default function AuthCallback() {
         const savedPrompt = localStorage.getItem("chatPrompt");
 
         if (savedPrompt && savedPrompt.trim() !== "") {
-          if(setPrompt) setPrompt(savedPrompt);
+          if (setPrompt) setPrompt(savedPrompt);
           await newChat(newAccessToken, savedPrompt);
         } else {
           setTimeout(() => router.replace("/"), 2000);
@@ -47,7 +47,7 @@ export default function AuthCallback() {
     };
 
     handleOAuthExchange();
-  }, [searchParams, router, dispatch]);
+  }, [searchParams, router, newChat, setPrompt, dispatch]);
 
   if (error) {
     return (

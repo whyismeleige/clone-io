@@ -1,13 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  User,
-  Mail,
-  Calendar,
-  Clock,
-  Camera,
-} from "lucide-react";
+import { User, Mail, Calendar, Clock, Camera } from "lucide-react";
 
 import {
   Breadcrumb,
@@ -210,19 +204,6 @@ export default function SettingsDialog({
                         </div>
                       )}
                     </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="pt-4 border-t space-y-3">
-                    <Button variant="outline" className="w-full justify-start">
-                      Edit Profile
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-destructive hover:text-destructive"
-                    >
-                      Delete Account
-                    </Button>
                   </div>
                 </>
               )}
