@@ -13,7 +13,11 @@ const chatRoutes = require("./routes/chat.routes");
 
 app.use(
   cors({
-    origin: ["https://josh-net.vercel.app/", "http://localhost:3001", "http://localhost:3000"],
+    origin: [
+      "https://clone-io.vercel.app",
+      "https://cloneio.piyushbuilds.me",
+      "http://localhost:3000",
+    ],
     credentials: true,
   })
 );
@@ -33,7 +37,6 @@ app.get("/health", (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
-
 
 app.use((req, res) => {
   res.status(404).json({
