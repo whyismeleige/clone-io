@@ -29,7 +29,7 @@ app.use("/api/chat", chatRoutes);
 app.get("/health", (req, res) => {
   res.status(200).json({
     status: "success",
-    message: "JOSH Net API is running",
+    message: "Clone IO API is running",
     timestamp: new Date().toISOString(),
   });
 });

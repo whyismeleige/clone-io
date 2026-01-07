@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
-const createRandomAvatar = require("../utils/avatar.utils");
 
 const MetadataSchema = new mongoose.Schema({
   ipAddress: String,
@@ -78,7 +77,21 @@ const UserSchema = new mongoose.Schema(
     },
     avatar: {
       type: String,
-      default: createRandomAvatar(),
+      default: function () {
+        const seed = crypto.randomUUID();
+        const styles = [
+          "adventurer",
+          "bigSmile",
+          "funEmoji",
+          "lorelei",
+          "micah",
+          "notionists",
+          "pixelArt",
+          "croodles",
+        ];
+        const style = styles[Math.floor(Math.random() * styles.length)];
+        return `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}`;
+      },
     },
     chats: [
       {
@@ -175,7 +188,7 @@ UserSchema.methods.saveToken = async function (token, metadata) {
 UserSchema.methods.saveChat = async function (chatId) {
   this.chats.push(chatId);
   return await this.save();
-}
+};
 
 UserSchema.methods.successfulLogin = async function (metadata) {
   this.activity.lastLogin = Date.now();
