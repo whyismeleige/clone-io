@@ -618,4 +618,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-Made with ❤️ using Next.js, Express, and Claude AI
+Made with ❤️ using Next.js, Express, and Claude
